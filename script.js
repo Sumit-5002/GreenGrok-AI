@@ -37,6 +37,8 @@ let userLocation = null;
 let isListening = false;
 let twoWayRecognition = null;
 let isTwoWayListening = false;
+let chatHistory = [];
+let currentLanguage = 'en'; // Default language
 
 // Market Price Prediction
 const cropSearch = document.getElementById('cropSearch');
@@ -456,6 +458,45 @@ const INDIAN_MARKET_DATA = {
     }
 };
 
+// Language configuration
+const LANGUAGE_CONFIG = {
+    'en': {
+        model: 'gemini-2.0-flash',
+        voice: 'en-US',
+        name: 'English'
+    },
+    'hi': {
+        model: 'gemini-2.0-flash-hi',
+        voice: 'hi-IN',
+        name: 'Hindi'
+    },
+    'mr': {
+        model: 'gemini-2.0-flash-mr',
+        voice: 'mr-IN',
+        name: 'Marathi'
+    },
+    'ta': {
+        model: 'gemini-2.0-flash-ta',
+        voice: 'ta-IN',
+        name: 'Tamil'
+    },
+    'te': {
+        model: 'gemini-2.0-flash-te',
+        voice: 'te-IN',
+        name: 'Telugu'
+    }
+};
+
+// Function to detect language
+function detectLanguage(text) {
+    // Simple language detection based on character ranges
+    if (/[\u0900-\u097F]/.test(text)) return 'hi'; // Hindi
+    if (/[\u0A80-\u0AFF]/.test(text)) return 'mr'; // Marathi
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta'; // Tamil
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te'; // Telugu
+    return 'en'; // Default to English
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     initializeVoiceRecognition();
@@ -489,7 +530,7 @@ function initializeVoiceRecognition() {
         recognition = new webkitSpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        recognition.lang = LANGUAGE_CONFIG[currentLanguage].voice;
 
         recognition.onstart = function() {
             isListening = true;
@@ -501,7 +542,7 @@ function initializeVoiceRecognition() {
         recognition.onend = function() {
             isListening = false;
             voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = "Ask GreenGrok about agriculture...";
+            userInput.placeholder = `Ask GreenGrok in ${LANGUAGE_CONFIG[currentLanguage].name}...`;
             userInput.classList.remove('listening');
         };
 
@@ -522,6 +563,10 @@ function initializeVoiceRecognition() {
             }
             if (finalTranscript) {
                 userInput.value = finalTranscript;
+                // Detect language from input
+                currentLanguage = detectLanguage(finalTranscript);
+                // Update recognition language
+                recognition.lang = LANGUAGE_CONFIG[currentLanguage].voice;
             }
         };
 
@@ -529,7 +574,7 @@ function initializeVoiceRecognition() {
             console.error('Speech recognition error:', event.error);
             isListening = false;
             voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = "Ask GreenGrok about agriculture...";
+            userInput.placeholder = `Ask GreenGrok in ${LANGUAGE_CONFIG[currentLanguage].name}...`;
             userInput.classList.remove('listening');
             addMessage(`
                 <div class="error">
@@ -681,41 +726,16 @@ function stopVoiceRecognition() {
 
 // Speak response with better voice settings
 function speakResponse(text) {
-    if (synthesis) { // Removed isVoiceMode check to allow deactivation message
-        // Cancel any ongoing speech
+    if (synthesis) {
         synthesis.cancel();
         
-        // Create a more concise version of the message for voice
-        let voiceText = text;
-        
-        // For market data
-        if (text.includes('Market analysis')) {
-            const crop = text.match(/for (.*?)\./)[1];
-            const price = text.match(/₹(.*?) per/)[1];
-            const trend = text.match(/(\d+\.\d+)% (increase|decrease)/);
-            voiceText = `${crop} price is ₹${price}. ${trend[1]}% ${trend[2]}.`;
-        }
-        
-        // For weather updates
-        if (text.includes('Current weather')) {
-            const temp = text.match(/(\d+)°C/)[1];
-            const condition = text.match(/is (.*?)\./)[1];
-            voiceText = `Temperature is ${temp} degrees. ${condition}.`;
-        }
-        
-        // For AI responses
-        if (text.includes('Main Answer:')) {
-            voiceText = text.split('Main Answer:')[1].split('Key Points:')[0].trim();
-        }
-        
-        // Create utterance with proper initialization
         const utterance = new SpeechSynthesisUtterance();
-        utterance.text = voiceText;
+        utterance.text = text;
         utterance.rate = 0.9;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
+        utterance.lang = LANGUAGE_CONFIG[currentLanguage].voice;
         
-        // Try to find a more natural voice
         const voices = synthesis.getVoices();
         const preferredVoices = [
             'Microsoft Zira Desktop',
@@ -725,48 +745,14 @@ function speakResponse(text) {
         ];
         
         const voice = voices.find(v => preferredVoices.includes(v.name)) || 
-                     voices.find(v => v.lang.includes('en')) || 
+                     voices.find(v => v.lang.includes(currentLanguage)) || 
                      voices[0];
         
         if (voice) {
             utterance.voice = voice;
         }
 
-        // Add event listeners for better voice interaction
-        utterance.onstart = () => {
-            console.log('Started speaking');
-            // Stop listening while speaking
-            if (twoWayRecognition) {
-                twoWayRecognition.stop();
-            }
-        };
-
-        utterance.onend = () => {
-            console.log('Finished speaking');
-            // Restart two-way recognition after speaking only if voice mode is active
-            if (isVoiceMode && twoWayRecognition) {
-                setTimeout(() => {
-                    twoWayRecognition.start();
-                }, 200);
-            }
-        };
-
-        utterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event);
-            // Restart listening if there's an error and voice mode is active
-            if (isVoiceMode && twoWayRecognition) {
-                twoWayRecognition.start();
-            }
-        };
-
-        // Ensure voices are loaded before speaking
-        if (synthesis.getVoices().length === 0) {
-            synthesis.onvoiceschanged = () => {
-                synthesis.speak(utterance);
-            };
-        } else {
-            synthesis.speak(utterance);
-        }
+        synthesis.speak(utterance);
     }
 }
 
@@ -1158,6 +1144,12 @@ function getSeason(month) {
 async function handleUserInput(input) {
     addMessage(input, 'user');
     
+    // Add user message to chat history
+    chatHistory.push({ role: 'user', content: input });
+    
+    // Detect language from input
+    currentLanguage = detectLanguage(input);
+    
     try {
         // Get location and time information
         const { timeInfo, locationInfo } = await getLocationAndTime();
@@ -1171,6 +1163,19 @@ async function handleUserInput(input) {
             context += `Location: ${locationInfo.city}, ${locationInfo.state}, ${locationInfo.country}. `;
         }
 
+        // Add chat history to context
+        if (chatHistory.length > 0) {
+            context += '\nRecent Chat Context:\n';
+            const recentHistory = chatHistory.slice(-3);
+            recentHistory.forEach((message, index) => {
+                const prefix = message.role === 'user' ? 'User' : 'Assistant';
+                const shortContent = message.content.length > 100 
+                    ? message.content.substring(0, 100) + '...' 
+                    : message.content;
+                context += `${prefix}: ${shortContent}\n`;
+            });
+        }
+
         if (!API_CONFIG.GEMINI_API_KEY || API_CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
             throw new Error('Gemini API key not configured');
         }
@@ -1182,7 +1187,7 @@ async function handleUserInput(input) {
         chatMessages.appendChild(typingIndicator);
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${LANGUAGE_CONFIG[currentLanguage].model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1193,9 +1198,11 @@ async function handleUserInput(input) {
                         text: `You are GreenGrok, an agricultural assistant created by the BINERY BEAST TEAM. 
                                Context: ${context}
                                The user asked: "${input}". 
+                               Please respond in ${LANGUAGE_CONFIG[currentLanguage].name}.
                                Please provide a helpful, detailed response focusing on agricultural advice, 
                                crop management, weather impact, or plant health. Consider the current time, 
-                               season, and location in your response. Format your response in the following structure:
+                               season, and location in your response.
+                               Format your response in the following structure:
                                
                                Main Answer: [Provide a clear, concise answer]
                                Key Points: [List 2-3 important points]
@@ -1225,6 +1232,9 @@ async function handleUserInput(input) {
         
         // Extract and format the response
         const generatedText = data.candidates[0].content.parts[0].text;
+        
+        // Add AI response to chat history
+        chatHistory.push({ role: 'assistant', content: generatedText });
         
         // Format the response for display
         const formattedResponse = generatedText
