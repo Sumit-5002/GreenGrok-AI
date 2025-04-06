@@ -485,65 +485,12 @@ const INDIAN_MARKET_DATA = {
     }
 };
 
-// Language configuration with improved voice selection
-const LANGUAGE_CONFIG = {
-    'en': {
-        model: 'gemini-2.0-flash',
-        voice: 'en-IN', // Changed to Indian English
-        name: 'English',
-        preferredVoices: ['Google हिन्दी', 'Microsoft Ravi', 'Microsoft Heera']
-    },
-    'hi': {
-        model: 'gemini-2.0-flash-hi',
-        voice: 'hi-IN',
-        name: 'Hindi',
-        preferredVoices: ['Google हिन्दी', 'Microsoft Ravi', 'Microsoft Heera']
-    },
-    'mr': {
-        model: 'gemini-2.0-flash-mr',
-        voice: 'mr-IN',
-        name: 'Marathi',
-        preferredVoices: ['Google मराठी', 'Microsoft Gopal']
-    },
-    'ta': {
-        model: 'gemini-2.0-flash-ta',
-        voice: 'ta-IN',
-        name: 'Tamil',
-        preferredVoices: ['Google தமிழ்', 'Microsoft Valluvar']
-    },
-    'te': {
-        model: 'gemini-2.0-flash-te',
-        voice: 'te-IN',
-        name: 'Telugu',
-        preferredVoices: ['Google తెలుగు', 'Microsoft Chitra']
-    }
+// Simplified configuration
+const CONFIG = {
+    model: 'gemini-2.0-flash',
+    voice: 'en-IN',
+    name: 'GreenGrok'
 };
-
-// Improved language detection
-function detectLanguage(text) {
-    // Check for Hindi characters
-    if (/[\u0900-\u097F]/.test(text)) return 'hi';
-    
-    // Check for Marathi characters
-    if (/[\u0A80-\u0AFF]/.test(text)) return 'mr';
-    
-    // Check for Tamil characters
-    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta';
-    
-    // Check for Telugu characters
-    if (/[\u0C00-\u0C7F]/.test(text)) return 'te';
-    
-    // Check for common Hindi words
-    const hindiWords = ['क्या', 'है', 'में', 'से', 'और', 'या', 'कर', 'हो', 'था', 'था'];
-    if (hindiWords.some(word => text.includes(word))) return 'hi';
-    
-    // Check for common Marathi words
-    const marathiWords = ['आहे', 'मी', 'तू', 'आम्ही', 'तुम्ही', 'काय', 'कोण', 'कुठे', 'कधी', 'कसे'];
-    if (marathiWords.some(word => text.includes(word))) return 'mr';
-    
-    // Default to English
-    return 'en';
-}
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
@@ -578,7 +525,7 @@ function initializeVoiceRecognition() {
         recognition = new webkitSpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = LANGUAGE_CONFIG[currentLanguage].voice;
+        recognition.lang = CONFIG.voice;
 
         recognition.onstart = function() {
             isListening = true;
@@ -590,7 +537,7 @@ function initializeVoiceRecognition() {
         recognition.onend = function() {
             isListening = false;
             voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = `Ask GreenGrok in ${LANGUAGE_CONFIG[currentLanguage].name}...`;
+            userInput.placeholder = `Ask GreenGrok in ${CONFIG.name}...`;
             userInput.classList.remove('listening');
         };
 
@@ -611,10 +558,7 @@ function initializeVoiceRecognition() {
             }
             if (finalTranscript) {
                 userInput.value = finalTranscript;
-                // Detect language from input
-                currentLanguage = detectLanguage(finalTranscript);
-                // Update recognition language
-                recognition.lang = LANGUAGE_CONFIG[currentLanguage].voice;
+                handleUserInput(finalTranscript);
             }
         };
 
@@ -622,7 +566,7 @@ function initializeVoiceRecognition() {
             console.error('Speech recognition error:', event.error);
             isListening = false;
             voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = `Ask GreenGrok in ${LANGUAGE_CONFIG[currentLanguage].name}...`;
+            userInput.placeholder = `Ask GreenGrok in ${CONFIG.name}...`;
             userInput.classList.remove('listening');
             addMessage(`
                 <div class="error">
@@ -639,6 +583,11 @@ function initializeVoiceRecognition() {
         synthesis.onvoiceschanged = () => {
             const voices = synthesis.getVoices();
             console.log('Available voices:', voices);
+            // Set default voice
+            if (voices.length > 0) {
+                const defaultVoice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
+                CONFIG.voice = defaultVoice.lang;
+            }
         };
     }
 }
@@ -649,7 +598,7 @@ function initializeTwoWayCommunication() {
         twoWayRecognition = new webkitSpeechRecognition();
         twoWayRecognition.continuous = true;
         twoWayRecognition.interimResults = true;
-        twoWayRecognition.lang = 'en-US';
+        twoWayRecognition.lang = CONFIG.voice;
 
         twoWayRecognition.onstart = function() {
             isTwoWayListening = true;
@@ -712,7 +661,7 @@ function toggleVoiceMode() {
         
         // Ensure speech synthesis is properly initialized
         if (synthesis) {
-            synthesis.cancel(); // Cancel any ongoing speech
+            synthesis.cancel();
         }
         
         // Add a small delay before speaking to ensure proper initialization
@@ -730,7 +679,7 @@ function toggleVoiceMode() {
         
         // Ensure speech synthesis is properly initialized
         if (synthesis) {
-            synthesis.cancel(); // Cancel any ongoing speech
+            synthesis.cancel();
         }
         
         // Stop two-way recognition first
@@ -778,34 +727,29 @@ function speakResponse(text) {
         synthesis.cancel();
         
         const utterance = new SpeechSynthesisUtterance();
-        utterance.text = text;
+        utterance.text = text.replace(/\*/g, '');
         utterance.rate = 0.9;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
         
-        // Get the current language configuration
-        const langConfig = LANGUAGE_CONFIG[currentLanguage];
-        utterance.lang = langConfig.voice;
-        
         // Get available voices
         const voices = synthesis.getVoices();
         
-        // Try to find the preferred voice for the current language
-        const preferredVoice = langConfig.preferredVoices.find(voiceName => 
-            voices.find(v => v.name === voiceName)
-        );
-        
-        if (preferredVoice) {
-            utterance.voice = voices.find(v => v.name === preferredVoice);
-        } else {
-            // Fallback to any voice that matches the language
-            const fallbackVoice = voices.find(v => v.lang.includes(currentLanguage));
-            if (fallbackVoice) {
-                utterance.voice = fallbackVoice;
-            }
+        // Try to find a voice that matches the language
+        const voice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
+        if (voice) {
+            utterance.voice = voice;
+            utterance.lang = voice.lang;
         }
         
+        // Add event listeners for debugging
+        utterance.onstart = () => console.log('Speech started');
+        utterance.onend = () => console.log('Speech ended');
+        utterance.onerror = (event) => console.error('Speech error:', event);
+        
         synthesis.speak(utterance);
+    } else {
+        console.error('Speech synthesis not available');
     }
 }
 
@@ -1266,9 +1210,6 @@ async function handleUserInput(input) {
     // Add user message to chat history
     chatHistory.push({ role: 'user', content: input });
     
-    // Detect language from input
-    currentLanguage = detectLanguage(input);
-    
     try {
         // Show typing indicator immediately
         const typingIndicator = document.createElement('div');
@@ -1306,7 +1247,7 @@ async function handleUserInput(input) {
 
         // Make Gemini API call with timeout
         const geminiResponse = await Promise.race([
-            fetch(`https://generativelanguage.googleapis.com/v1beta/models/${LANGUAGE_CONFIG[currentLanguage].model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
+            fetch(`https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1317,7 +1258,6 @@ async function handleUserInput(input) {
                             text: `You are GreenGrok, an agricultural assistant. 
                                    Context: ${context}
                                    Question: "${input}"
-                                   Respond in ${LANGUAGE_CONFIG[currentLanguage].name}.
                                    Format: Main Answer, Key Points, Recommendations.
                                    Keep response focused on agriculture.`
                         }]
@@ -1344,7 +1284,7 @@ async function handleUserInput(input) {
         }
         
         // Extract and format the response
-        const generatedText = data.candidates[0].content.parts[0].text;
+        const generatedText = data.candidates[0].content.parts[0].text.replace(/\*\*/g, '');
         
         // Add AI response to chat history
         chatHistory.push({ role: 'assistant', content: generatedText });
