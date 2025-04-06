@@ -10,10 +10,37 @@ const imageUpload = document.getElementById('image-upload');
 const imagePreview = document.getElementById('image-preview');
 const analysisResult = document.getElementById('analysis-result');
 
+// Cache Configuration
+const CACHE_CONFIG = {
+    location: {
+        ttl: 3600000, // 1 hour
+        data: null,
+        timestamp: null
+    },
+    weather: {
+        ttl: 1800000, // 30 minutes
+        data: null,
+        timestamp: null
+    },
+    market: {
+        ttl: 3600000, // 1 hour
+        data: {},
+        timestamp: null
+    }
+};
+
 // API Configuration - Add your keys here
 const API_CONFIG = {
     WEATHER_API_KEY: '3ff2442bed5b632cb1c3e06c66c95053', // Get from https://openweathermap.org/api
     GEMINI_API_KEY: 'AIzaSyDuf_-H9p7hd_Zk1mq5dj9Aql79o5bMp1M', // Get from Google AI Studio
+};
+
+// API Timeout Configuration
+const API_TIMEOUT = {
+    location: 20000,    // 20 seconds for location detection
+    weather: 20000,     // 20 seconds for weather data
+    market: 20000,      // 20 seconds for market data
+    gemini: 20000       // 20 seconds for AI responses
 };
 
 // Local AI responses for testing
@@ -458,43 +485,64 @@ const INDIAN_MARKET_DATA = {
     }
 };
 
-// Language configuration
+// Language configuration with improved voice selection
 const LANGUAGE_CONFIG = {
     'en': {
         model: 'gemini-2.0-flash',
-        voice: 'en-US',
-        name: 'English'
+        voice: 'en-IN', // Changed to Indian English
+        name: 'English',
+        preferredVoices: ['Google हिन्दी', 'Microsoft Ravi', 'Microsoft Heera']
     },
     'hi': {
         model: 'gemini-2.0-flash-hi',
         voice: 'hi-IN',
-        name: 'Hindi'
+        name: 'Hindi',
+        preferredVoices: ['Google हिन्दी', 'Microsoft Ravi', 'Microsoft Heera']
     },
     'mr': {
         model: 'gemini-2.0-flash-mr',
         voice: 'mr-IN',
-        name: 'Marathi'
+        name: 'Marathi',
+        preferredVoices: ['Google मराठी', 'Microsoft Gopal']
     },
     'ta': {
         model: 'gemini-2.0-flash-ta',
         voice: 'ta-IN',
-        name: 'Tamil'
+        name: 'Tamil',
+        preferredVoices: ['Google தமிழ்', 'Microsoft Valluvar']
     },
     'te': {
         model: 'gemini-2.0-flash-te',
         voice: 'te-IN',
-        name: 'Telugu'
+        name: 'Telugu',
+        preferredVoices: ['Google తెలుగు', 'Microsoft Chitra']
     }
 };
 
-// Function to detect language
+// Improved language detection
 function detectLanguage(text) {
-    // Simple language detection based on character ranges
-    if (/[\u0900-\u097F]/.test(text)) return 'hi'; // Hindi
-    if (/[\u0A80-\u0AFF]/.test(text)) return 'mr'; // Marathi
-    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta'; // Tamil
-    if (/[\u0C00-\u0C7F]/.test(text)) return 'te'; // Telugu
-    return 'en'; // Default to English
+    // Check for Hindi characters
+    if (/[\u0900-\u097F]/.test(text)) return 'hi';
+    
+    // Check for Marathi characters
+    if (/[\u0A80-\u0AFF]/.test(text)) return 'mr';
+    
+    // Check for Tamil characters
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta';
+    
+    // Check for Telugu characters
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te';
+    
+    // Check for common Hindi words
+    const hindiWords = ['क्या', 'है', 'में', 'से', 'और', 'या', 'कर', 'हो', 'था', 'था'];
+    if (hindiWords.some(word => text.includes(word))) return 'hi';
+    
+    // Check for common Marathi words
+    const marathiWords = ['आहे', 'मी', 'तू', 'आम्ही', 'तुम्ही', 'काय', 'कोण', 'कुठे', 'कधी', 'कसे'];
+    if (marathiWords.some(word => text.includes(word))) return 'mr';
+    
+    // Default to English
+    return 'en';
 }
 
 // Initialize the application
@@ -724,7 +772,7 @@ function stopVoiceRecognition() {
     }
 }
 
-// Speak response with better voice settings
+// Improved voice synthesis
 function speakResponse(text) {
     if (synthesis) {
         synthesis.cancel();
@@ -734,24 +782,29 @@ function speakResponse(text) {
         utterance.rate = 0.9;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
-        utterance.lang = LANGUAGE_CONFIG[currentLanguage].voice;
         
+        // Get the current language configuration
+        const langConfig = LANGUAGE_CONFIG[currentLanguage];
+        utterance.lang = langConfig.voice;
+        
+        // Get available voices
         const voices = synthesis.getVoices();
-        const preferredVoices = [
-            'Microsoft Zira Desktop',
-            'Microsoft David Desktop',
-            'Google हिन्दी',
-            'Google हिंदी'
-        ];
         
-        const voice = voices.find(v => preferredVoices.includes(v.name)) || 
-                     voices.find(v => v.lang.includes(currentLanguage)) || 
-                     voices[0];
+        // Try to find the preferred voice for the current language
+        const preferredVoice = langConfig.preferredVoices.find(voiceName => 
+            voices.find(v => v.name === voiceName)
+        );
         
-        if (voice) {
-            utterance.voice = voice;
+        if (preferredVoice) {
+            utterance.voice = voices.find(v => v.name === preferredVoice);
+        } else {
+            // Fallback to any voice that matches the language
+            const fallbackVoice = voices.find(v => v.lang.includes(currentLanguage));
+            if (fallbackVoice) {
+                utterance.voice = fallbackVoice;
+            }
         }
-
+        
         synthesis.speak(utterance);
     }
 }
@@ -792,114 +845,49 @@ async function updateWeather() {
             throw new Error('OpenWeatherMap API key not configured');
         }
 
+        // Check if we have valid cached weather data
+        const currentTime = Date.now();
+        if (CACHE_CONFIG.weather.data && 
+            CACHE_CONFIG.weather.timestamp && 
+            (currentTime - CACHE_CONFIG.weather.timestamp) < CACHE_CONFIG.weather.ttl) {
+            updateWeatherUI(CACHE_CONFIG.weather.data);
+            return;
+        }
+
         if (!userLocation) {
             throw new Error('Location not available');
         }
 
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${API_CONFIG.WEATHER_API_KEY}&units=metric`
-        );
+        // Make weather API call with timeout
+        const weatherResponse = await Promise.race([
+            fetch(
+                `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${API_CONFIG.WEATHER_API_KEY}&units=metric`
+            ),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Weather API request timed out')), API_TIMEOUT.weather)
+            )
+        ]);
         
-        if (!response.ok) {
+        if (!weatherResponse.ok) {
             throw new Error('Weather API request failed');
         }
         
-        const data = await response.json();
+        const data = await weatherResponse.json();
         
-        // Update weather information with more details
-        const weatherIcon = document.querySelector('.weather-icon i');
-        const temperature = document.querySelector('.temperature');
-        const condition = document.querySelector('.condition');
-        const recommendation = document.querySelector('.recommendation');
-        const humidity = document.querySelector('.humidity');
-        const wind = document.querySelector('.wind');
-        const pressure = document.querySelector('.pressure');
-        const visibility = document.querySelector('.visibility');
-        const sunrise = document.querySelector('.sunrise');
-        const sunset = document.querySelector('.sunset');
-
-        // Update temperature and condition
-        temperature.textContent = `${Math.round(data.main.temp)}°C`;
-        condition.textContent = data.weather[0].description;
+        // Cache the weather data
+        CACHE_CONFIG.weather.data = data;
+        CACHE_CONFIG.weather.timestamp = currentTime;
         
-        // Update weather icon based on conditions
-        const iconMap = {
-            'Clear': 'fa-sun',
-            'Clouds': 'fa-cloud',
-            'Rain': 'fa-cloud-rain',
-            'Snow': 'fa-snowflake',
-            'Thunderstorm': 'fa-bolt',
-            'Drizzle': 'fa-cloud-rain',
-            'Mist': 'fa-smog',
-            'Fog': 'fa-smog',
-            'Haze': 'fa-smog',
-            'Dust': 'fa-wind',
-            'Sand': 'fa-wind',
-            'Ash': 'fa-wind',
-            'Squall': 'fa-wind',
-            'Tornado': 'fa-wind'
-        };
-        
-        weatherIcon.className = `fas ${iconMap[data.weather[0].main] || 'fa-cloud'}`;
-        
-        // Update additional weather details
-        humidity.innerHTML = `<i class="fas fa-tint"></i> ${data.main.humidity}%`;
-        wind.innerHTML = `<i class="fas fa-wind"></i> ${Math.round(data.wind.speed * 3.6)} km/h`;
-        pressure.innerHTML = `<i class="fas fa-compress-arrows-alt"></i> ${data.main.pressure} hPa`;
-        visibility.innerHTML = `<i class="fas fa-eye"></i> ${data.visibility / 1000} km`;
-        
-        // Convert sunrise and sunset times to local time
-        const sunriseTime = new Date(data.sys.sunrise * 1000);
-        const sunsetTime = new Date(data.sys.sunset * 1000);
-        sunrise.innerHTML = `<i class="fas fa-sun"></i> ${sunriseTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-        sunset.innerHTML = `<i class="fas fa-moon"></i> ${sunsetTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-
-        // Generate detailed agricultural recommendations
-        let recommendations = [];
-        
-        // Temperature-based recommendations
-        if (data.main.temp > 30) {
-            recommendations.push("High temperature - Increase irrigation frequency");
-        } else if (data.main.temp < 10) {
-            recommendations.push("Low temperature - Protect sensitive crops");
-        } else {
-            recommendations.push("Optimal temperature for crop growth");
-        }
-
-        // Humidity-based recommendations
-        if (data.main.humidity > 80) {
-            recommendations.push("High humidity - Watch for fungal diseases");
-        } else if (data.main.humidity < 40) {
-            recommendations.push("Low humidity - Consider additional irrigation");
-        }
-
-        // Wind-based recommendations
-        if (data.wind.speed > 5) {
-            recommendations.push("Strong winds - Secure young plants and greenhouses");
-        }
-
-        // Visibility-based recommendations
-        if (data.visibility < 1000) {
-            recommendations.push("Poor visibility - Delay spraying operations");
-        }
-
-        // Update recommendation display
-        recommendation.innerHTML = recommendations.map(rec => `<p>${rec}</p>`).join('');
-
-        // Add location information
-        const locationInfo = document.createElement('p');
-        locationInfo.className = 'location-info';
-        locationInfo.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${data.name}`;
-        recommendation.parentNode.insertBefore(locationInfo, recommendation.nextSibling);
-
-        // Update last update time
-        const updateTime = document.createElement('p');
-        updateTime.className = 'update-time';
-        updateTime.innerHTML = `<i class="fas fa-clock"></i> Last updated: ${new Date().toLocaleTimeString()}`;
-        recommendation.parentNode.appendChild(updateTime);
-
+        // Update UI with weather data
+        updateWeatherUI(data);
     } catch (error) {
         console.error('Error fetching weather data:', error);
+        // Try to use cached data if available, even if expired
+        if (CACHE_CONFIG.weather.data) {
+            updateWeatherUI(CACHE_CONFIG.weather.data);
+            return;
+        }
+        
         const weatherIcon = document.querySelector('.weather-icon i');
         const temperature = document.querySelector('.temperature');
         const condition = document.querySelector('.condition');
@@ -910,6 +898,100 @@ async function updateWeather() {
         condition.textContent = 'Weather data unavailable';
         recommendation.innerHTML = '<p>Please enable location access and check your weather API key</p>';
     }
+}
+
+// Helper function to update weather UI
+function updateWeatherUI(data) {
+    const weatherIcon = document.querySelector('.weather-icon i');
+    const temperature = document.querySelector('.temperature');
+    const condition = document.querySelector('.condition');
+    const recommendation = document.querySelector('.recommendation');
+    const humidity = document.querySelector('.humidity');
+    const wind = document.querySelector('.wind');
+    const pressure = document.querySelector('.pressure');
+    const visibility = document.querySelector('.visibility');
+    const sunrise = document.querySelector('.sunrise');
+    const sunset = document.querySelector('.sunset');
+
+    // Update temperature and condition
+    temperature.textContent = `${Math.round(data.main.temp)}°C`;
+    condition.textContent = data.weather[0].description;
+    
+    // Update weather icon based on conditions
+    const iconMap = {
+        'Clear': 'fa-sun',
+        'Clouds': 'fa-cloud',
+        'Rain': 'fa-cloud-rain',
+        'Snow': 'fa-snowflake',
+        'Thunderstorm': 'fa-bolt',
+        'Drizzle': 'fa-cloud-rain',
+        'Mist': 'fa-smog',
+        'Fog': 'fa-smog',
+        'Haze': 'fa-smog',
+        'Dust': 'fa-wind',
+        'Sand': 'fa-wind',
+        'Ash': 'fa-wind',
+        'Squall': 'fa-wind',
+        'Tornado': 'fa-wind'
+    };
+    
+    weatherIcon.className = `fas ${iconMap[data.weather[0].main] || 'fa-cloud'}`;
+    
+    // Update additional weather details
+    humidity.innerHTML = `<i class="fas fa-tint"></i> ${data.main.humidity}%`;
+    wind.innerHTML = `<i class="fas fa-wind"></i> ${Math.round(data.wind.speed * 3.6)} km/h`;
+    pressure.innerHTML = `<i class="fas fa-compress-arrows-alt"></i> ${data.main.pressure} hPa`;
+    visibility.innerHTML = `<i class="fas fa-eye"></i> ${data.visibility / 1000} km`;
+    
+    // Convert sunrise and sunset times to local time
+    const sunriseTime = new Date(data.sys.sunrise * 1000);
+    const sunsetTime = new Date(data.sys.sunset * 1000);
+    sunrise.innerHTML = `<i class="fas fa-sun"></i> ${sunriseTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    sunset.innerHTML = `<i class="fas fa-moon"></i> ${sunsetTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
+    // Generate agricultural recommendations
+    let recommendations = [];
+    
+    // Temperature-based recommendations
+    if (data.main.temp > 30) {
+        recommendations.push("High temperature - Increase irrigation frequency");
+    } else if (data.main.temp < 10) {
+        recommendations.push("Low temperature - Protect sensitive crops");
+    } else {
+        recommendations.push("Optimal temperature for crop growth");
+    }
+
+    // Humidity-based recommendations
+    if (data.main.humidity > 80) {
+        recommendations.push("High humidity - Watch for fungal diseases");
+    } else if (data.main.humidity < 40) {
+        recommendations.push("Low humidity - Consider additional irrigation");
+    }
+
+    // Wind-based recommendations
+    if (data.wind.speed > 5) {
+        recommendations.push("Strong winds - Secure young plants and greenhouses");
+    }
+
+    // Visibility-based recommendations
+    if (data.visibility < 1000) {
+        recommendations.push("Poor visibility - Delay spraying operations");
+    }
+
+    // Update recommendation display
+    recommendation.innerHTML = recommendations.map(rec => `<p>${rec}</p>`).join('');
+
+    // Add location information
+    const locationInfo = document.createElement('p');
+    locationInfo.className = 'location-info';
+    locationInfo.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${data.name}`;
+    recommendation.parentNode.insertBefore(locationInfo, recommendation.nextSibling);
+
+    // Update last update time
+    const updateTime = document.createElement('p');
+    updateTime.className = 'update-time';
+    updateTime.innerHTML = `<i class="fas fa-clock"></i> Last updated: ${new Date().toLocaleTimeString()}`;
+    recommendation.parentNode.appendChild(updateTime);
 }
 
 // Setup event listeners
@@ -1089,7 +1171,7 @@ function formatAnalysisText(text) {
 // Add location and time information to AI context
 async function getLocationAndTime() {
     try {
-        // Get current time
+        // Get current time (no caching needed as it's always current)
         const now = new Date();
         const timeInfo = {
             time: now.toLocaleTimeString(),
@@ -1100,34 +1182,70 @@ async function getLocationAndTime() {
             season: getSeason(now.getMonth())
         };
 
+        // Check if we have valid cached location data
+        const currentTime = Date.now();
+        if (CACHE_CONFIG.location.data && 
+            CACHE_CONFIG.location.timestamp && 
+            (currentTime - CACHE_CONFIG.location.timestamp) < CACHE_CONFIG.location.ttl) {
+            return { timeInfo, locationInfo: CACHE_CONFIG.location.data };
+        }
+
         // Get location if available
         let locationInfo = null;
         if (navigator.geolocation) {
             const position = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                });
+                const timeout = setTimeout(() => {
+                    reject(new Error('Location request timed out'));
+                }, API_TIMEOUT.location);
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        clearTimeout(timeout);
+                        resolve(pos);
+                    },
+                    (err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: API_TIMEOUT.location,
+                        maximumAge: 0
+                    }
+                );
             });
 
-            // Get location details using reverse geocoding
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
-            const data = await response.json();
+            // Get location details using reverse geocoding with timeout
+            const locationResponse = await Promise.race([
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Geocoding request timed out')), API_TIMEOUT.location)
+                )
+            ]);
+
+            const locationData = await locationResponse.json();
             
             locationInfo = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                city: data.address.city || data.address.town || data.address.village,
-                state: data.address.state,
-                country: data.address.country,
-                address: data.display_name
+                city: locationData.address.city || locationData.address.town || locationData.address.village,
+                state: locationData.address.state,
+                country: locationData.address.country,
+                address: locationData.display_name
             };
+
+            // Cache the location data
+            CACHE_CONFIG.location.data = locationInfo;
+            CACHE_CONFIG.location.timestamp = currentTime;
         }
 
         return { timeInfo, locationInfo };
     } catch (error) {
         console.error('Error getting location and time:', error);
+        // Return cached data if available, even if expired
+        if (CACHE_CONFIG.location.data) {
+            return { timeInfo: null, locationInfo: CACHE_CONFIG.location.data };
+        }
         return { timeInfo: null, locationInfo: null };
     }
 }
@@ -1142,6 +1260,7 @@ function getSeason(month) {
 
 // Handle user input with better formatting
 async function handleUserInput(input) {
+    // Show immediate feedback
     addMessage(input, 'user');
     
     // Add user message to chat history
@@ -1151,28 +1270,33 @@ async function handleUserInput(input) {
     currentLanguage = detectLanguage(input);
     
     try {
-        // Get location and time information
-        const { timeInfo, locationInfo } = await getLocationAndTime();
+        // Show typing indicator immediately
+        const typingIndicator = document.createElement('div');
+        typingIndicator.classList.add('message', 'ai-message');
+        typingIndicator.innerHTML = '<div class="message-content typing">GreenGrok is typing...</div>';
+        chatMessages.appendChild(typingIndicator);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Get location and time information in parallel with other operations
+        const locationAndTimePromise = getLocationAndTime();
         
-        // Create context string
+        // Create context string with reduced history
         let context = '';
+        const { timeInfo, locationInfo } = await locationAndTimePromise;
+        
         if (timeInfo) {
-            context += `Current time: ${timeInfo.time}, Date: ${timeInfo.date}, Day: ${timeInfo.day}, Season: ${timeInfo.season}. `;
+            context += `Current time: ${timeInfo.time}, Date: ${timeInfo.date}, Season: ${timeInfo.season}. `;
         }
         if (locationInfo) {
-            context += `Location: ${locationInfo.city}, ${locationInfo.state}, ${locationInfo.country}. `;
+            context += `Location: ${locationInfo.city}, ${locationInfo.state}. `;
         }
 
-        // Add chat history to context
+        // Add complete chat history to context
         if (chatHistory.length > 0) {
-            context += '\nRecent Chat Context:\n';
-            const recentHistory = chatHistory.slice(-3);
-            recentHistory.forEach((message, index) => {
+            context += '\nChat History:\n';
+            chatHistory.forEach((message) => {
                 const prefix = message.role === 'user' ? 'User' : 'Assistant';
-                const shortContent = message.content.length > 100 
-                    ? message.content.substring(0, 100) + '...' 
-                    : message.content;
-                context += `${prefix}: ${shortContent}\n`;
+                context += `${prefix}: ${message.content}\n`;
             });
         }
 
@@ -1180,48 +1304,37 @@ async function handleUserInput(input) {
             throw new Error('Gemini API key not configured');
         }
 
-        // Show typing indicator
-        const typingIndicator = document.createElement('div');
-        typingIndicator.classList.add('message', 'ai-message');
-        typingIndicator.innerHTML = '<div class="message-content typing">GreenGrok is typing...</div>';
-        chatMessages.appendChild(typingIndicator);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${LANGUAGE_CONFIG[currentLanguage].model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `You are GreenGrok, an agricultural assistant created by the BINERY BEAST TEAM. 
-                               Context: ${context}
-                               The user asked: "${input}". 
-                               Please respond in ${LANGUAGE_CONFIG[currentLanguage].name}.
-                               Please provide a helpful, detailed response focusing on agricultural advice, 
-                               crop management, weather impact, or plant health. Consider the current time, 
-                               season, and location in your response.
-                               Format your response in the following structure:
-                               
-                               Main Answer: [Provide a clear, concise answer]
-                               Key Points: [List 2-3 important points]
-                               Recommendations: [Provide specific, actionable recommendations]
-                               
-                               Keep the response professional, clear, and focused on agricultural solutions.
-                               Do not use HTML tags, markdown, or special characters in the response.`
+        // Make Gemini API call with timeout
+        const geminiResponse = await Promise.race([
+            fetch(`https://generativelanguage.googleapis.com/v1beta/models/${LANGUAGE_CONFIG[currentLanguage].model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `You are GreenGrok, an agricultural assistant. 
+                                   Context: ${context}
+                                   Question: "${input}"
+                                   Respond in ${LANGUAGE_CONFIG[currentLanguage].name}.
+                                   Format: Main Answer, Key Points, Recommendations.
+                                   Keep response focused on agriculture.`
+                        }]
                     }]
-                }]
+                }),
             }),
-        });
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Gemini API request timed out')), API_TIMEOUT.gemini)
+            )
+        ]);
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Gemini API Error:', errorData);
+        if (!geminiResponse.ok) {
+            const errorData = await geminiResponse.json();
             throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
         }
         
-        const data = await response.json();
+        const data = await geminiResponse.json();
         
         // Remove typing indicator
         chatMessages.removeChild(typingIndicator);
@@ -1243,9 +1356,11 @@ async function handleUserInput(input) {
                 if (line.startsWith('Main Answer:')) {
                     return `<p class="main-answer">${line.replace('Main Answer:', '').trim()}</p>`;
                 } else if (line.startsWith('Key Points:')) {
-                    return `<p class="key-points">${line.replace('Key Points:', '').trim()}</p>`;
+                    const points = line.replace('Key Points:', '').trim().split('.');
+                    return `<ul class="key-points">${points.map(point => point.trim()).filter(point => point).map(point => `<li>${point}</li>`).join('')}</ul>`;
                 } else if (line.startsWith('Recommendations:')) {
-                    return `<p class="recommendations">${line.replace('Recommendations:', '').trim()}</p>`;
+                    const points = line.replace('Recommendations:', '').trim().split('.');
+                    return `<ul class="recommendations">${points.map(point => point.trim()).filter(point => point).map(point => `<li>${point}</li>`).join('')}</ul>`;
                 } else {
                     return `<p>${line}</p>`;
                 }
@@ -1268,6 +1383,12 @@ async function handleUserInput(input) {
         }
     } catch (error) {
         console.error('Error getting AI response:', error);
+        // Remove typing indicator if it exists
+        const typingIndicator = document.querySelector('.typing');
+        if (typingIndicator) {
+            typingIndicator.parentElement.parentElement.remove();
+        }
+        
         const errorMessage = `I'm having trouble processing your request. ${error.message}. Please try again or check your API configuration.`;
         addMessage(errorMessage, 'ai');
         if (isVoiceMode) {

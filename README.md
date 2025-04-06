@@ -1,42 +1,71 @@
-# GreenGrok - Agricultural Assistant
+# GreenGrok - AI-Powered Agricultural Assistant
 
-GreenGrok is an intelligent agricultural assistant that helps farmers and agricultural professionals with real-time information, analysis, and recommendations. Built with modern web technologies, it provides a user-friendly interface for accessing agricultural knowledge and tools.
+## Overview
+GreenGrok is a web-based agricultural assistant that provides personalized farming advice, weather updates, and market price information to Indian farmers. The system uses Google's Gemini AI model to deliver context-aware responses in multiple Indian languages.
 
-## 🌟 Features
+## Features
 
-### 1. Intelligent Chat Interface
+### 1. Multilingual Support
+GreenGrok supports 5 Indian languages with automatic language detection and response:
+
+1. **English** (en)
+   - Indian English accent
+   - Preferred voices: Google हिन्दी, Microsoft Ravi, Microsoft Heera
+
+2. **Hindi** (hi)
+   - Native Hindi support
+   - Preferred voices: Google हिन्दी, Microsoft Ravi, Microsoft Heera
+
+3. **Marathi** (mr)
+   - Native Marathi support
+   - Preferred voices: Google मराठी, Microsoft Gopal
+
+4. **Tamil** (ta)
+   - Native Tamil support
+   - Preferred voices: Google தமிழ், Microsoft Valluvar
+
+5. **Telugu** (te)
+   - Native Telugu support
+   - Preferred voices: Google తెలుగు, Microsoft Chitra
+
+The system automatically:
+- Detects the input language
+- Responds in the same language
+- Uses appropriate regional voices for speech output
+
+### 2. Intelligent Chat Interface
 - Natural language processing for understanding agricultural queries
 - Multilingual support (English, Hindi, Marathi, Tamil, Telugu)
 - Context-aware responses with chat history
 - Voice input and output capabilities
 
-### 2. Weather Information
+### 3. Weather Information
 - Real-time weather updates
 - Location-based weather data
 - Agricultural weather recommendations
 - Temperature, humidity, wind speed, and precipitation information
 
-### 3. Market Price Analysis
+### 4. Market Price Analysis
 - Real-time crop price information
 - Price trends and predictions
 - Location-specific market data
 - Historical price comparison
 - Market recommendations
 
-### 4. Image Analysis
+### 5. Image Analysis
 - Plant disease detection
 - Soil condition analysis
 - Crop health monitoring
 - Pest identification
 - Growth stage analysis
 
-### 5. Voice Interaction
+### 6. Voice Interaction
 - Voice-to-text input
 - Text-to-speech output
 - Multilingual voice support
 - Hands-free operation
 
-### 6. Agricultural Knowledge Base
+### 7. Agricultural Knowledge Base
 - Crop management advice
 - Pest control recommendations
 - Soil health information
