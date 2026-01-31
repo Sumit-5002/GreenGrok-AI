@@ -31,9 +31,12 @@ const CACHE_CONFIG = {
 
 // API Configuration - Add your keys here
 const API_CONFIG = {
-    WEATHER_API_KEY: '3ff2442bed5b632cb1c3e06c66c95053', // Get from https://openweathermap.org/api
-    GEMINI_API_KEY: 'AIzaSyDuf_-H9p7hd_Zk1mq5dj9Aql79o5bMp1M', // Get from Google AI Studio
+  WEATHER_API_KEY: "__WEATHER_API_KEY__",
+  GEMINI_API_KEY: "__GEMINI_API_KEY__",
 };
+
+const OGD_BASE_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
+const OGD_API_KEY = "__OGD_API_KEY__";
 
 // API Timeout Configuration
 const API_TIMEOUT = {
@@ -72,8 +75,7 @@ const cropSearch = document.getElementById('cropSearch');
 const searchCrop = document.getElementById('searchCrop');
 
 // Market Price Prediction with Open Government Data API
-const OGD_BASE_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
-const OGD_API_KEY = '579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b';
+
 
 // Mapping of common crop names to commodity codes
 const COMMODITY_MAP = {
