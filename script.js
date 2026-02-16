@@ -29,14 +29,14 @@ const CACHE_CONFIG = {
     }
 };
 
-// API Configuration - Add your keys here
+// API Configuration - Load from localStorage
 const API_CONFIG = {
-  WEATHER_API_KEY: "__WEATHER_API_KEY__",
-  GEMINI_API_KEY: "__GEMINI_API_KEY__",
+    WEATHER_API_KEY: localStorage.getItem('weather_api_key') || "",
+    GEMINI_API_KEY: localStorage.getItem('gemini_api_key') || "",
+    OGD_API_KEY: localStorage.getItem('ogd_api_key') || ""
 };
 
 const OGD_BASE_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
-const OGD_API_KEY = "__OGD_API_KEY__";
 
 // API Timeout Configuration
 const API_TIMEOUT = {
@@ -67,7 +67,7 @@ let userLocation = null;
 let isListening = false;
 let twoWayRecognition = null;
 let isTwoWayListening = false;
-let chatHistory = [];
+let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
 let currentLanguage = 'en'; // Default language
 
 // Market Price Prediction
@@ -499,11 +499,17 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeVoiceRecognition();
     getLocationAndUpdateWeather();
     setupEventListeners();
-    addWelcomeMessage();
+    setupSettingsModal();
+
+    if (chatHistory.length > 0) {
+        chatHistory.forEach(msg => addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai', false));
+    } else {
+        addWelcomeMessage();
+    }
 });
 
 // Add message to chat with better formatting
-function addMessage(text, sender) {
+function addMessage(text, sender, save = true) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', `${sender}-message`);
     
@@ -512,13 +518,38 @@ function addMessage(text, sender) {
     
     if (sender === 'user') {
         contentDiv.textContent = text;
+        messageDiv.appendChild(contentDiv);
+        chatMessages.appendChild(messageDiv);
     } else {
-        contentDiv.innerHTML = text;
+        // Use marked for markdown rendering
+        const htmlContent = window.marked ? marked.parse(text) : text;
+
+        if (save) {
+            // Typing effect for new AI messages
+            contentDiv.innerHTML = '';
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+
+            // Fade in effect
+            contentDiv.style.opacity = '0';
+            contentDiv.innerHTML = htmlContent;
+            setTimeout(() => {
+                contentDiv.style.transition = 'opacity 0.5s ease';
+                contentDiv.style.opacity = '1';
+            }, 50);
+        } else {
+            contentDiv.innerHTML = htmlContent;
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+        }
     }
     
-    messageDiv.appendChild(contentDiv);
-    chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    if (save) {
+        chatHistory.push({ role: sender === 'user' ? 'user' : 'assistant', content: text });
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    }
 }
 
 // Initialize Web Speech API
@@ -934,14 +965,21 @@ function updateWeatherUI(data) {
     recommendation.parentNode.insertBefore(locationInfo, recommendation.nextSibling);
 
     // Update last update time
-    const updateTime = document.createElement('p');
-    updateTime.className = 'update-time';
+    let updateTime = document.querySelector('.update-time');
+    if (!updateTime) {
+        updateTime = document.createElement('p');
+        updateTime.className = 'update-time';
+        recommendation.parentNode.appendChild(updateTime);
+    }
     updateTime.innerHTML = `<i class="fas fa-clock"></i> Last updated: ${new Date().toLocaleTimeString()}`;
-    recommendation.parentNode.appendChild(updateTime);
 }
 
 // Setup event listeners
 function setupEventListeners() {
+    const modeToggle = document.querySelector('.mode-toggle');
+    const voiceToggle = document.querySelector('.voice-toggle');
+    const settingsBtn = document.getElementById('settings-btn');
+
     // Dark mode toggle
     modeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
@@ -953,6 +991,39 @@ function setupEventListeners() {
     // Voice mode toggle
     voiceToggle.addEventListener('click', () => {
         toggleVoiceMode();
+    });
+
+    // Settings modal toggle
+    settingsBtn.addEventListener('click', () => {
+        document.getElementById('settings-modal').style.display = 'block';
+    });
+
+    // New Chat button
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+        if (confirm('Are you sure you want to start a new chat? This will clear your current history.')) {
+            chatHistory = [];
+            localStorage.removeItem('chatHistory');
+            chatMessages.innerHTML = '';
+            addWelcomeMessage();
+        }
+    });
+
+    // Export Chat button
+    document.getElementById('export-chat-btn').addEventListener('click', () => {
+        if (chatHistory.length === 0) {
+            alert('No chat history to export.');
+            return;
+        }
+        const exportText = chatHistory.map(msg => `${msg.role === 'user' ? 'User' : 'GreenGrok'}: ${msg.content}`).join('\n\n');
+        const blob = new Blob([exportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `greengrok-chat-${new Date().toISOString().slice(0, 10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     });
 
     // Send button click
@@ -1209,9 +1280,6 @@ async function handleUserInput(input) {
     // Show immediate feedback
     addMessage(input, 'user');
     
-    // Add user message to chat history
-    chatHistory.push({ role: 'user', content: input });
-    
     try {
         // Show typing indicator immediately
         const typingIndicator = document.createElement('div');
@@ -1243,8 +1311,8 @@ async function handleUserInput(input) {
             });
         }
 
-        if (!API_CONFIG.GEMINI_API_KEY || API_CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
-            throw new Error('Gemini API key not configured');
+        if (!API_CONFIG.GEMINI_API_KEY) {
+            throw new Error('Gemini API key not configured. Please add it in settings.');
         }
 
         // Make Gemini API call with timeout
@@ -1342,11 +1410,55 @@ async function handleUserInput(input) {
 // Update welcome message to be simpler
 function addWelcomeMessage() {
     const welcomeMessage = "Hello! I'm GreenGrok, your agricultural assistant created by the BINERY BEAST TEAM. How can I help you with your agricultural needs today?";
-    addMessage(welcomeMessage, 'ai');
+    addMessage(welcomeMessage, 'ai', false);
     
     if (isVoiceMode) {
         speakResponse(welcomeMessage);
     }
+}
+
+// Settings Modal Logic
+function setupSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    const closeBtn = document.querySelector('.close-modal');
+    const saveBtn = document.getElementById('save-settings');
+
+    const geminiInput = document.getElementById('gemini-key');
+    const weatherInput = document.getElementById('weather-key');
+    const ogdInput = document.getElementById('ogd-key');
+
+    // Load existing keys into inputs
+    geminiInput.value = API_CONFIG.GEMINI_API_KEY;
+    weatherInput.value = API_CONFIG.WEATHER_API_KEY;
+    ogdInput.value = API_CONFIG.OGD_API_KEY;
+
+    closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = (event) => {
+        if (event.target == modal) modal.style.display = 'none';
+    };
+
+    saveBtn.onclick = () => {
+        const geminiKey = geminiInput.value.trim();
+        const weatherKey = weatherInput.value.trim();
+        const ogdKey = ogdInput.value.trim();
+
+        localStorage.setItem('gemini_api_key', geminiKey);
+        localStorage.setItem('weather_api_key', weatherKey);
+        localStorage.setItem('ogd_api_key', ogdKey);
+
+        API_CONFIG.GEMINI_API_KEY = geminiKey;
+        API_CONFIG.WEATHER_API_KEY = weatherKey;
+        API_CONFIG.OGD_API_KEY = ogdKey;
+
+        modal.style.display = 'none';
+
+        // Refresh weather with new key if provided
+        if (weatherKey) {
+            getLocationAndUpdateWeather();
+        }
+
+        alert('Settings saved successfully!');
+    };
 }
 
 function clearImage() {
@@ -1495,6 +1607,7 @@ function displayMarketData(crop, marketData) {
         return;
     }
 
+    const chartId = `chart-${Date.now()}`;
     const formattedMessage = `
         <div class="market-analysis-container">
             <div class="market-header">
@@ -1503,6 +1616,9 @@ function displayMarketData(crop, marketData) {
                     <i class="fas fa-map-marker-alt"></i>
                     ${marketData.market}, ${marketData.state}
                 </div>
+            </div>
+            <div class="market-chart-container" style="padding: 20px; background: white; margin: 10px; border-radius: 12px;">
+                <canvas id="${chartId}"></canvas>
             </div>
             <div class="market-prices">
                 <div class="price-item">
@@ -1552,6 +1668,50 @@ function displayMarketData(crop, marketData) {
     `;
 
     addMessage(formattedMessage, 'ai');
+
+    // Initialize the chart after the message is added to DOM
+    setTimeout(() => {
+        const ctx = document.getElementById(chartId).getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Last Month', 'Last Week', 'Current', 'Predicted'],
+                datasets: [{
+                    label: 'Price (₹)',
+                    data: [
+                        parseFloat(marketData.lastMonthPrice.replace(/,/g, '')),
+                        parseFloat(marketData.lastWeekPrice.replace(/,/g, '')),
+                        parseFloat(marketData.currentPrice.replace(/,/g, '')),
+                        parseFloat(marketData.predictedPrice.replace(/,/g, ''))
+                    ],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#10b981',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: { color: '#f3f4f6' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }, 100);
 
     if (isVoiceMode) {
         speakResponse(`Market analysis for ${crop} in ${marketData.market}. Current price is ₹${marketData.currentPrice} per ${marketData.unit}. 
@@ -1627,7 +1787,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Add seasonal tips
+    addSeasonalTips();
 });
+
+function addSeasonalTips() {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentMonth = new Date().getMonth();
+    const seasonalTips = {
+        0: "January: Best time for harvesting sugarcane and sowing late-season wheat.",
+        1: "February: Ideal for planting summer vegetables and monitoring mustard crops.",
+        2: "March: Wheat harvesting begins. Start preparing soil for cotton.",
+        3: "April: Peak wheat harvesting season. Good for sowing moong and sunflower.",
+        4: "May: Soil preparation for Kharif crops. Sowing of cotton and maize.",
+        5: "June: Monsoon arrives. Peak sowing time for rice, soybean, and pulses.",
+        6: "July: Transplanting rice and weeding of early-sown crops.",
+        7: "August: Top-dressing of fertilizers in rice and maize.",
+        8: "September: Harvesting of short-duration crops. Monitoring for pests.",
+        9: "October: Sowing of Rabi crops like wheat, mustard, and gram.",
+        10: "November: Peak sowing time for wheat. Harvesting of rice.",
+        11: "December: Irrigation of wheat and mustard. Harvesting of cotton."
+    };
+
+    const sidebar = document.querySelector('.sidebar');
+    const tipWidget = document.createElement('div');
+    tipWidget.className = 'widget seasonal-tips';
+    tipWidget.innerHTML = `
+        <h3><i class="fas fa-calendar-alt"></i> ${months[currentMonth]} Tips</h3>
+        <p>${seasonalTips[currentMonth]}</p>
+        <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
+            <i class="fas fa-info-circle"></i> Based on Indian agricultural cycle.
+        </div>
+    `;
+    sidebar.appendChild(tipWidget);
+}
 
 // Add event listener for the chat input microphone button
 document.addEventListener('DOMContentLoaded', function() {
