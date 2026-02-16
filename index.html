@@ -13,7 +13,7 @@
         <!-- Header Section -->
         <header>
             <div class="header-left">
-                <button id="sidebar-toggle" class="icon-btn mobile-only" title="Toggle Sidebar">
+                <button id="sidebar-toggle" class="icon-btn mobile-only" title="Toggle Sidebar" aria-label="Toggle Sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="logo">
@@ -24,19 +24,19 @@
                 </div>
             </div>
             <div class="header-controls">
-                <button class="icon-btn" id="new-chat-btn" title="New Chat">
+                <button class="icon-btn" id="new-chat-btn" title="New Chat" aria-label="Start New Chat">
                     <i class="fas fa-plus"></i>
                 </button>
-                <button class="icon-btn" id="export-chat-btn" title="Export Chat">
+                <button class="icon-btn" id="export-chat-btn" title="Export Chat" aria-label="Export Chat History">
                     <i class="fas fa-download"></i>
                 </button>
-                <button class="icon-btn settings-toggle" id="settings-btn" title="API Settings">
+                <button class="icon-btn settings-toggle" id="settings-btn" title="API Settings" aria-label="Open API Settings">
                     <i class="fas fa-cog"></i>
                 </button>
-                <button class="icon-btn mode-toggle" title="Toggle Theme">
+                <button class="icon-btn mode-toggle" title="Toggle Theme" aria-label="Toggle Light/Dark Mode">
                     <i class="fas fa-moon"></i>
                 </button>
-                <button class="icon-btn voice-toggle" title="Toggle Voice Mode">
+                <button class="icon-btn voice-toggle" title="Toggle Voice Mode" aria-label="Toggle Voice Mode">
                     <i class="fas fa-microphone"></i>
                 </button>
             </div>
@@ -51,10 +51,10 @@
                 </div>
                 <div class="input-area">
                     <div class="input-container">
-                        <input type="text" id="user-input" placeholder="Ask GreenGrok about agriculture...">
-                        <button id="send-btn"><i class="fas fa-paper-plane"></i></button>
-                        <button id="voice-btn" class="voice-toggle"><i class="fas fa-microphone"></i></button>
-                        <label for="image-upload" class="image-upload-label">
+                        <input type="text" id="user-input" placeholder="Ask GreenGrok about agriculture..." aria-label="Chat message input">
+                        <button id="send-btn" aria-label="Send Message"><i class="fas fa-paper-plane"></i></button>
+                        <button id="voice-btn" class="voice-toggle" aria-label="Voice Input"><i class="fas fa-microphone"></i></button>
+                        <label for="image-upload" class="image-upload-label" aria-label="Upload image for analysis">
                             <i class="fas fa-image"></i>
                         </label>
                         <input type="file" id="image-upload" accept="image/*" style="display: none;">
@@ -118,8 +118,8 @@
                     <h3><i class="fas fa-chart-line"></i> Market Price Prediction</h3>
                     <div class="search-container">
                         <div class="search-box">
-                            <input type="text" id="cropSearch" placeholder="Search for a crop (e.g., rice, wheat, maize)">
-                            <button id="searchCrop" class="search-button">
+                            <input type="text" id="cropSearch" placeholder="Search for a crop (e.g., rice, wheat, maize)" aria-label="Search for a crop">
+                            <button id="searchCrop" class="search-button" aria-label="Search">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
@@ -146,7 +146,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2><i class="fas fa-key"></i> API Settings</h2>
-                <span class="close-modal">&times;</span>
+                <span class="close-modal" role="button" tabindex="0" aria-label="Close API Settings Modal">&times;</span>
             </div>
             <p class="settings-help">Enter your API keys to enable GreenGrok's full capabilities. These keys are stored locally in your browser.</p>
             <div class="settings-form">
