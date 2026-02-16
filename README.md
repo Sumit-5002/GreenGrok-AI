@@ -35,6 +35,16 @@ GreenGrok supports multiple Indian languages with automatic language detection a
 
 ## 🚀 Getting Started
 
+### 🌐 GitHub Pages Deployment
+GreenGrok is fully optimized for GitHub Pages. Since it's a static site, you don't need a server!
+
+**How to deploy:**
+1. **Push your code** to your GitHub repository.
+2. Go to your repository **Settings** on GitHub.
+3. Click on **Pages** in the left sidebar.
+4. Under **Build and deployment > Source**, select **GitHub Actions**.
+5. GitHub will now automatically use the included `.github/workflows/static.yml` to build and host your site!
+
 ### 1. Installation
 1. Clone the repository:
 ```bash
