@@ -29,14 +29,38 @@ const CACHE_CONFIG = {
     }
 };
 
+// Persistent Cache Helpers
+function setCache(key, data, ttl) {
+    const cacheData = {
+        data: data,
+        timestamp: Date.now(),
+        ttl: ttl
+    };
+    localStorage.setItem(`greengrok_cache_${key}`, JSON.stringify(cacheData));
+}
+
+function getCache(key) {
+    const cached = localStorage.getItem(`greengrok_cache_${key}`);
+    if (!cached) return null;
+
+    try {
+        const { data, timestamp, ttl } = JSON.parse(cached);
+        if (Date.now() - timestamp < ttl) {
+            return data;
+        }
+        localStorage.removeItem(`greengrok_cache_${key}`);
+    } catch (e) {
+        console.error(`Error parsing cache for ${key}:`, e);
+    }
+    return null;
+}
+
 // API Configuration - Load from localStorage
 const API_CONFIG = {
     WEATHER_API_KEY: localStorage.getItem('weather_api_key') || "",
     GEMINI_API_KEY: localStorage.getItem('gemini_api_key') || "",
     OGD_API_KEY: localStorage.getItem('ogd_api_key') || ""
 };
-
-const OGD_BASE_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
 
 // API Timeout Configuration
 const API_TIMEOUT = {
@@ -652,12 +676,23 @@ async function updateWeather() {
 
         if (!userLocation) return;
 
+        // Optimized: Check persistent cache before network request
+        const cachedWeather = getCache('weather');
+        if (cachedWeather) {
+            updateWeatherUI(cachedWeather);
+            return;
+        }
+
         const weatherResponse = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${API_CONFIG.WEATHER_API_KEY}&units=metric`
         );
         
         if (!weatherResponse.ok) throw new Error('Weather API request failed');
         const data = await weatherResponse.json();
+
+        // Cache successful response
+        setCache('weather', data, CACHE_CONFIG.weather.ttl);
+
         updateWeatherUI(data);
     } catch (error) {
         console.error('Weather error:', error);
@@ -677,9 +712,19 @@ function updateWeatherUI(data) {
 }
 
 function getLocationAndUpdateWeather() {
+    // Optimized: Check persistent cache before requesting geolocation
+    const cachedLocation = getCache('location');
+    if (cachedLocation) {
+        userLocation = cachedLocation;
+        updateWeather();
+        return;
+    }
+
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
             userLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+            // Cache location data
+            setCache('location', userLocation, CACHE_CONFIG.location.ttl);
             updateWeather();
         }, () => {
             console.log('Location access denied');
