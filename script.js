@@ -46,18 +46,6 @@ const API_TIMEOUT = {
     gemini: 20000       // 20 seconds for AI responses
 };
 
-// Local AI responses for testing
-const AI_RESPONSES = {
-    'hello': "Hello! I'm GreenGrok, your agricultural assistant. How can I help you today?",
-    'weather': "I can help you with weather information. The current weather is displayed in the sidebar.",
-    'crop': "I can help you with crop management. What specific information do you need?",
-    'soil': "I can provide soil analysis recommendations. Please upload an image of your soil for analysis.",
-    'pest': "I can help identify pests and diseases. Please upload an image of the affected plant.",
-    'creator': "I was created by the BINERY BEAST TEAM, a group of passionate developers dedicated to agricultural technology.",
-    'developer': "I was developed by the BINERY BEAST TEAM, who are committed to creating innovative solutions for farmers.",
-    'default': "I'm GreenGrok, your agricultural assistant. I can help you with weather, crops, soil conditions, or pest control. You can also upload images for analysis."
-};
-
 // State variables
 let isVoiceMode = false;
 let recognition = null;
@@ -69,41 +57,6 @@ let twoWayRecognition = null;
 let isTwoWayListening = false;
 let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
 let currentLanguage = 'en'; // Default language
-
-// Market Price Prediction
-const cropSearch = document.getElementById('cropSearch');
-const searchCrop = document.getElementById('searchCrop');
-
-// Market Price Prediction with Open Government Data API
-
-
-// Mapping of common crop names to commodity codes
-const COMMODITY_MAP = {
-    'rice': 'RICE',
-    'wheat': 'WHEAT',
-    'maize': 'MAIZE',
-    'soybean': 'SOYBEAN',
-    'cotton': 'COTTON',
-    'sugarcane': 'SUGARCANE',
-    'potato': 'POTATO',
-    'onion': 'ONION',
-    'tomato': 'TOMATO',
-    'chilli': 'CHILLI',
-    'turmeric': 'TURMERIC',
-    'coriander': 'CORIANDER',
-    'cumin': 'CUMIN',
-    'mustard': 'MUSTARD',
-    'groundnut': 'GROUNDNUT',
-    'sesame': 'SESAME',
-    'jowar': 'JOWAR',
-    'bajra': 'BAJRA',
-    'ragi': 'RAGI',
-    'moong': 'MOONG',
-    'urad': 'URAD',
-    'chana': 'CHANA',
-    'masoor': 'MASOOR',
-    'arhar': 'ARHAR'
-};
 
 // Enhanced market data with real prices from different locations
 const INDIAN_MARKET_DATA = {
@@ -489,7 +442,7 @@ const INDIAN_MARKET_DATA = {
 
 // Simplified configuration
 const CONFIG = {
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     voice: 'en-IN',
     name: 'GreenGrok'
 };
@@ -500,6 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     getLocationAndUpdateWeather();
     setupEventListeners();
     setupSettingsModal();
+    addSeasonalTips();
 
     if (chatHistory.length > 0) {
         chatHistory.forEach(msg => addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai', false));
@@ -562,15 +516,15 @@ function initializeVoiceRecognition() {
 
         recognition.onstart = function() {
             isListening = true;
-            voiceBtn.classList.add('voice-active');
+            if (voiceBtn) voiceBtn.classList.add('voice-active');
             userInput.placeholder = "Listening...";
             userInput.classList.add('listening');
         };
 
         recognition.onend = function() {
             isListening = false;
-            voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = `Ask GreenGrok in ${CONFIG.name}...`;
+            if (voiceBtn) voiceBtn.classList.remove('voice-active');
+            userInput.placeholder = `Ask GreenGrok about agriculture...`;
             userInput.classList.remove('listening');
         };
 
@@ -598,25 +552,16 @@ function initializeVoiceRecognition() {
         recognition.onerror = function(event) {
             console.error('Speech recognition error:', event.error);
             isListening = false;
-            voiceBtn.classList.remove('voice-active');
-            userInput.placeholder = `Ask GreenGrok in ${CONFIG.name}...`;
+            if (voiceBtn) voiceBtn.classList.remove('voice-active');
+            userInput.placeholder = `Ask GreenGrok about agriculture...`;
             userInput.classList.remove('listening');
-            addMessage(`
-                <div class="error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <p>Voice recognition error: ${event.error}</p>
-                </div>
-            `, 'ai');
         };
     }
 
     if ('speechSynthesis' in window) {
         synthesis = window.speechSynthesis;
-        // Wait for voices to be loaded
         synthesis.onvoiceschanged = () => {
             const voices = synthesis.getVoices();
-            console.log('Available voices:', voices);
-            // Set default voice
             if (voices.length > 0) {
                 const defaultVoice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
                 CONFIG.voice = defaultVoice.lang;
@@ -640,7 +585,6 @@ function initializeTwoWayCommunication() {
 
         twoWayRecognition.onend = function() {
             isTwoWayListening = false;
-            // Remove listening indicator
             const chatMessages = document.getElementById('chat-messages');
             const lastMessage = chatMessages.lastChild;
             if (lastMessage && lastMessage.querySelector('.listening-indicator')) {
@@ -649,41 +593,22 @@ function initializeTwoWayCommunication() {
         };
 
         twoWayRecognition.onresult = function(event) {
-            let interimTranscript = '';
             let finalTranscript = '';
-
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
                 }
             }
 
             if (finalTranscript) {
-                // Stop any ongoing speech
-                if (synthesis) {
-                    synthesis.cancel();
-                }
-                // Process the voice input and get AI response
+                if (synthesis) synthesis.cancel();
                 handleUserInput(finalTranscript);
             }
-        };
-
-        twoWayRecognition.onerror = function(event) {
-            console.error('Two-way communication error:', event.error);
-            isTwoWayListening = false;
-            addMessage(`
-                <div class="error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <p>Two-way communication error: ${event.error}</p>
-                </div>
-            `, 'ai');
         };
     }
 }
 
-// Toggle voice mode for two-way communication
+// Toggle voice mode
 function toggleVoiceMode() {
     isVoiceMode = !isVoiceMode;
     const voiceIcon = voiceToggle.querySelector('i');
@@ -691,296 +616,79 @@ function toggleVoiceMode() {
     if (isVoiceMode) {
         voiceIcon.classList.remove('fa-microphone');
         voiceIcon.classList.add('fa-microphone-slash');
-        
-        // Ensure speech synthesis is properly initialized
-        if (synthesis) {
-            synthesis.cancel();
-        }
-        
-        // Add a small delay before speaking to ensure proper initialization
-        setTimeout(() => {
-            speakResponse('Voice mode activated. You can speak now.');
-        }, 100);
-        
-        if (!twoWayRecognition) {
-            initializeTwoWayCommunication();
-        }
+        if (synthesis) synthesis.cancel();
+        setTimeout(() => speakResponse('Voice mode activated. You can speak now.'), 100);
+        if (!twoWayRecognition) initializeTwoWayCommunication();
         twoWayRecognition.start();
     } else {
         voiceIcon.classList.remove('fa-microphone-slash');
         voiceIcon.classList.add('fa-microphone');
-        
-        // Ensure speech synthesis is properly initialized
-        if (synthesis) {
-            synthesis.cancel();
-        }
-        
-        // Stop two-way recognition first
-        if (twoWayRecognition) {
-            twoWayRecognition.stop();
-        }
-        
-        // Add a small delay before speaking to ensure proper initialization
-        setTimeout(() => {
-            speakResponse('Voice mode deactivated.');
-        }, 100);
+        if (synthesis) synthesis.cancel();
+        if (twoWayRecognition) twoWayRecognition.stop();
+        setTimeout(() => speakResponse('Voice mode deactivated.'), 100);
     }
 }
 
-// Start voice-to-text recognition
-function startVoiceRecognition() {
-    if (recognition) {
-        try {
-            recognition.start();
-            voiceBtn.classList.add('voice-active');
-            console.log('Voice recognition started');
-        } catch (error) {
-            console.error('Error starting voice recognition:', error);
-            stopVoiceRecognition();
-        }
-    }
-}
-
-// Stop voice-to-text recognition
-function stopVoiceRecognition() {
-    if (recognition) {
-        try {
-            recognition.stop();
-            voiceBtn.classList.remove('voice-active');
-            console.log('Voice recognition stopped');
-        } catch (error) {
-            console.error('Error stopping voice recognition:', error);
-        }
-    }
-}
-
-// Improved voice synthesis
+// Speak response
 function speakResponse(text) {
     if (synthesis) {
         synthesis.cancel();
-        
         const utterance = new SpeechSynthesisUtterance();
         utterance.text = text.replace(/\*/g, '');
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
-        // Get available voices
+        utterance.rate = 0.95;
         const voices = synthesis.getVoices();
-        
-        // Try to find a voice that matches the language
         const voice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
-        if (voice) {
-            utterance.voice = voice;
-            utterance.lang = voice.lang;
-        }
-        
-        // Add event listeners for debugging
-        utterance.onstart = () => console.log('Speech started');
-        utterance.onend = () => console.log('Speech ended');
-        utterance.onerror = (event) => console.error('Speech error:', event);
-        
+        if (voice) utterance.voice = voice;
         synthesis.speak(utterance);
-    } else {
-        console.error('Speech synthesis not available');
     }
 }
 
-// Get user's location
-function getLocationAndUpdateWeather() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                userLocation = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude
-                };
-                updateWeather();
-                weatherInterval = setInterval(updateWeather, 300000); // Update every 5 minutes
-            },
-            (error) => {
-                console.error('Error getting location:', error);
-                // Fallback to a default location if geolocation fails
-                userLocation = { lat: 51.5074, lon: -0.1278 }; // Default to London
-                updateWeather();
-                weatherInterval = setInterval(updateWeather, 300000);
-            }
-        );
-    } else {
-        console.error('Geolocation is not supported by this browser');
-        // Fallback to a default location
-        userLocation = { lat: 51.5074, lon: -0.1278 }; // Default to London
-        updateWeather();
-        weatherInterval = setInterval(updateWeather, 300000);
-    }
-}
-
-// Update weather information
+// Weather update
 async function updateWeather() {
     try {
         if (!API_CONFIG.WEATHER_API_KEY || API_CONFIG.WEATHER_API_KEY === 'YOUR_OPENWEATHERMAP_API_KEY') {
-            throw new Error('OpenWeatherMap API key not configured');
+            throw new Error('Weather API key not configured');
         }
 
-        // Check if we have valid cached weather data
-        const currentTime = Date.now();
-        if (CACHE_CONFIG.weather.data && 
-            CACHE_CONFIG.weather.timestamp && 
-            (currentTime - CACHE_CONFIG.weather.timestamp) < CACHE_CONFIG.weather.ttl) {
-            updateWeatherUI(CACHE_CONFIG.weather.data);
-            return;
-        }
+        if (!userLocation) return;
 
-        if (!userLocation) {
-            throw new Error('Location not available');
-        }
-
-        // Make weather API call with timeout
-        const weatherResponse = await Promise.race([
-            fetch(
-                `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${API_CONFIG.WEATHER_API_KEY}&units=metric`
-            ),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Weather API request timed out')), API_TIMEOUT.weather)
-            )
-        ]);
+        const weatherResponse = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${userLocation.lat}&lon=${userLocation.lon}&appid=${API_CONFIG.WEATHER_API_KEY}&units=metric`
+        );
         
-        if (!weatherResponse.ok) {
-            throw new Error('Weather API request failed');
-        }
-        
+        if (!weatherResponse.ok) throw new Error('Weather API request failed');
         const data = await weatherResponse.json();
-        
-        // Cache the weather data
-        CACHE_CONFIG.weather.data = data;
-        CACHE_CONFIG.weather.timestamp = currentTime;
-        
-        // Update UI with weather data
         updateWeatherUI(data);
     } catch (error) {
-        console.error('Error fetching weather data:', error);
-        // Try to use cached data if available, even if expired
-        if (CACHE_CONFIG.weather.data) {
-            updateWeatherUI(CACHE_CONFIG.weather.data);
-            return;
-        }
-        
-        const weatherIcon = document.querySelector('.weather-icon i');
-        const temperature = document.querySelector('.temperature');
-        const condition = document.querySelector('.condition');
-        const recommendation = document.querySelector('.recommendation');
-        
-        weatherIcon.className = 'fas fa-exclamation-triangle';
-        temperature.textContent = 'N/A';
-        condition.textContent = 'Weather data unavailable';
-        recommendation.innerHTML = '<p>Please enable location access and check your weather API key</p>';
+        console.error('Weather error:', error);
+        document.querySelector('.temperature').textContent = 'N/A';
+        document.querySelector('.condition').textContent = 'Check API Key';
     }
 }
 
-// Helper function to update weather UI
 function updateWeatherUI(data) {
-    const weatherIcon = document.querySelector('.weather-icon i');
-    const temperature = document.querySelector('.temperature');
-    const condition = document.querySelector('.condition');
-    const recommendation = document.querySelector('.recommendation');
-    const humidity = document.querySelector('.humidity');
-    const wind = document.querySelector('.wind');
-    const pressure = document.querySelector('.pressure');
-    const visibility = document.querySelector('.visibility');
-    const sunrise = document.querySelector('.sunrise');
-    const sunset = document.querySelector('.sunset');
-
-    // Update temperature and condition
-    temperature.textContent = `${Math.round(data.main.temp)}°C`;
-    condition.textContent = data.weather[0].description;
+    document.querySelector('.temperature').textContent = `${Math.round(data.main.temp)}°C`;
+    document.querySelector('.condition').textContent = data.weather[0].description;
+    document.querySelector('.humidity').innerHTML = `<i class="fas fa-tint"></i> ${data.main.humidity}%`;
+    document.querySelector('.wind').innerHTML = `<i class="fas fa-wind"></i> ${Math.round(data.wind.speed * 3.6)} km/h`;
     
-    // Update weather icon based on conditions
-    const iconMap = {
-        'Clear': 'fa-sun',
-        'Clouds': 'fa-cloud',
-        'Rain': 'fa-cloud-rain',
-        'Snow': 'fa-snowflake',
-        'Thunderstorm': 'fa-bolt',
-        'Drizzle': 'fa-cloud-rain',
-        'Mist': 'fa-smog',
-        'Fog': 'fa-smog',
-        'Haze': 'fa-smog',
-        'Dust': 'fa-wind',
-        'Sand': 'fa-wind',
-        'Ash': 'fa-wind',
-        'Squall': 'fa-wind',
-        'Tornado': 'fa-wind'
-    };
-    
-    weatherIcon.className = `fas ${iconMap[data.weather[0].main] || 'fa-cloud'}`;
-    
-    // Update additional weather details
-    humidity.innerHTML = `<i class="fas fa-tint"></i> ${data.main.humidity}%`;
-    wind.innerHTML = `<i class="fas fa-wind"></i> ${Math.round(data.wind.speed * 3.6)} km/h`;
-    pressure.innerHTML = `<i class="fas fa-compress-arrows-alt"></i> ${data.main.pressure} hPa`;
-    visibility.innerHTML = `<i class="fas fa-eye"></i> ${data.visibility / 1000} km`;
-    
-    // Convert sunrise and sunset times to local time
-    const sunriseTime = new Date(data.sys.sunrise * 1000);
-    const sunsetTime = new Date(data.sys.sunset * 1000);
-    sunrise.innerHTML = `<i class="fas fa-sun"></i> ${sunriseTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-    sunset.innerHTML = `<i class="fas fa-moon"></i> ${sunsetTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-
-    // Generate agricultural recommendations
-    let recommendations = [];
-    
-    // Temperature-based recommendations
-    if (data.main.temp > 30) {
-        recommendations.push("High temperature - Increase irrigation frequency");
-    } else if (data.main.temp < 10) {
-        recommendations.push("Low temperature - Protect sensitive crops");
-    } else {
-        recommendations.push("Optimal temperature for crop growth");
-    }
-
-    // Humidity-based recommendations
-    if (data.main.humidity > 80) {
-        recommendations.push("High humidity - Watch for fungal diseases");
-    } else if (data.main.humidity < 40) {
-        recommendations.push("Low humidity - Consider additional irrigation");
-    }
-
-    // Wind-based recommendations
-    if (data.wind.speed > 5) {
-        recommendations.push("Strong winds - Secure young plants and greenhouses");
-    }
-
-    // Visibility-based recommendations
-    if (data.visibility < 1000) {
-        recommendations.push("Poor visibility - Delay spraying operations");
-    }
-
-    // Update recommendation display
-    recommendation.innerHTML = recommendations.map(rec => `<p>${rec}</p>`).join('');
-
-    // Add location information
-    const locationInfo = document.createElement('p');
-    locationInfo.className = 'location-info';
-    locationInfo.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${data.name}`;
-    recommendation.parentNode.insertBefore(locationInfo, recommendation.nextSibling);
-
-    // Update last update time
-    let updateTime = document.querySelector('.update-time');
-    if (!updateTime) {
-        updateTime = document.createElement('p');
-        updateTime.className = 'update-time';
-        recommendation.parentNode.appendChild(updateTime);
-    }
-    updateTime.innerHTML = `<i class="fas fa-clock"></i> Last updated: ${new Date().toLocaleTimeString()}`;
+    const iconMap = { 'Clear': 'fa-sun', 'Clouds': 'fa-cloud', 'Rain': 'fa-cloud-rain', 'Thunderstorm': 'fa-bolt' };
+    document.querySelector('.weather-icon i').className = `fas ${iconMap[data.weather[0].main] || 'fa-cloud'}`;
 }
 
-// Setup event listeners
-function setupEventListeners() {
-    const modeToggle = document.querySelector('.mode-toggle');
-    const voiceToggle = document.querySelector('.voice-toggle');
-    const settingsBtn = document.getElementById('settings-btn');
+function getLocationAndUpdateWeather() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            userLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+            updateWeather();
+        }, () => {
+            console.log('Location access denied');
+        });
+    }
+}
 
-    // Dark mode toggle
+// Event Listeners
+function setupEventListeners() {
     modeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
         const icon = modeToggle.querySelector('i');
@@ -988,19 +696,23 @@ function setupEventListeners() {
         icon.classList.toggle('fa-sun');
     });
 
-    // Voice mode toggle
-    voiceToggle.addEventListener('click', () => {
-        toggleVoiceMode();
+    voiceToggle.addEventListener('click', () => toggleVoiceMode());
+
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.toggle('active');
+        });
+    }
+
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        document.getElementById('settings-modal').style.display = 'flex';
     });
 
-    // Settings modal toggle
-    settingsBtn.addEventListener('click', () => {
-        document.getElementById('settings-modal').style.display = 'block';
-    });
-
-    // New Chat button
     document.getElementById('new-chat-btn').addEventListener('click', () => {
-        if (confirm('Are you sure you want to start a new chat? This will clear your current history.')) {
+        if (confirm('Clear chat history?')) {
             chatHistory = [];
             localStorage.removeItem('chatHistory');
             chatMessages.innerHTML = '';
@@ -1008,850 +720,218 @@ function setupEventListeners() {
         }
     });
 
-    // Export Chat button
     document.getElementById('export-chat-btn').addEventListener('click', () => {
-        if (chatHistory.length === 0) {
-            alert('No chat history to export.');
-            return;
-        }
-        const exportText = chatHistory.map(msg => `${msg.role === 'user' ? 'User' : 'GreenGrok'}: ${msg.content}`).join('\n\n');
-        const blob = new Blob([exportText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
+        const text = chatHistory.map(m => `${m.role}: ${m.content}`).join('\n\n');
+        const blob = new Blob([text], { type: 'text/plain' });
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `greengrok-chat-${new Date().toISOString().slice(0, 10)}.txt`;
-        document.body.appendChild(a);
+        a.href = URL.createObjectURL(blob);
+        a.download = 'greengrok-chat.txt';
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     });
 
-    // Send button click
     sendBtn.addEventListener('click', () => {
-        const message = userInput.value.trim();
-        if (message) {
-            handleUserInput(message);
-            userInput.value = '';
-        }
+        const msg = userInput.value.trim();
+        if (msg) { handleUserInput(msg); userInput.value = ''; }
     });
 
-    // Enter key press
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            const message = userInput.value.trim();
-            if (message) {
-                handleUserInput(message);
-                userInput.value = '';
-            }
+            const msg = userInput.value.trim();
+            if (msg) { handleUserInput(msg); userInput.value = ''; }
         }
     });
 
-    // Image upload
+    if (voiceBtn) {
+        voiceBtn.addEventListener('click', () => {
+            if (!recognition) initializeVoiceRecognition();
+            isListening ? recognition.stop() : recognition.start();
+        });
+    }
+
     imageUpload.addEventListener('change', async (event) => {
         const file = event.target.files[0];
-        if (file) {
-            // Show loading state in chat
-            addMessage('<div class="loading">Analyzing image...</div>', 'ai');
-            
+        if (!file) return;
+
+        addMessage('<div class="loading">Analyzing image...</div>', 'ai');
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64Image = e.target.result.split(',')[1];
             try {
-                // Convert image to base64
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    const base64Image = e.target.result.split(',')[1];
-                    const imageUrl = e.target.result;
-                    
-                    // Check if API key is configured
-                    if (!API_CONFIG.GEMINI_API_KEY || API_CONFIG.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
-                        throw new Error('Please configure your Gemini API key in the API_CONFIG object');
-                    }
-
-                    // Send image to Gemini API for analysis using the new model
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [
-                                    {
-                                        text: "Analyze this agricultural image and provide information in the following format:\n\n" +
-                                              "Description: [Brief description of what is shown in the image]\n\n" +
-                                              "Analysis:\n" +
-                                              "1. [First observation]\n" +
-                                              "2. [Second observation]\n" +
-                                              "3. [Third observation]\n\n" +
-                                              "Recommendations:\n" +
-                                              "1. [First recommendation]\n" +
-                                              "2. [Second recommendation]\n" +
-                                              "3. [Third recommendation]\n\n" +
-                                              "Please provide clear, concise information without using markdown or special formatting."
-                                    },
-                                    {
-                                        inline_data: {
-                                            mime_type: "image/jpeg",
-                                            data: base64Image
-                                        }
-                                    }
-                                ]
-                            }],
-                            generationConfig: {
-                                temperature: 0.4,
-                                topK: 32,
-                                topP: 1,
-                                maxOutputTokens: 2048,
-                            }
-                        }),
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
-                    }
-
-                    const data = await response.json();
-                    
-                    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-                        throw new Error('Invalid response format from Gemini API');
-                    }
-
-                    const analysis = data.candidates[0].content.parts[0].text;
-
-                    // Create formatted message with image and analysis
-                    const formattedMessage = `
-                        <div class="image-analysis-container">
-                            <div class="uploaded-image">
-                                <img src="${imageUrl}" alt="Uploaded image">
-                            </div>
-                            <div class="analysis-content">
-                                <h4>Image Analysis</h4>
-                                <div class="analysis-text">${formatAnalysisText(analysis)}</div>
-                            </div>
-                        </div>
-                    `;
-
-                    // Remove loading message and add the analysis
-                    const chatMessages = document.getElementById('chat-messages');
-                    chatMessages.removeChild(chatMessages.lastChild);
-                    addMessage(formattedMessage, 'ai');
-
-                    if (isVoiceMode) {
-                        speakResponse(analysis);
-                    }
-                };
-                reader.readAsDataURL(file);
-            } catch (error) {
-                console.error('Error analyzing image:', error);
-                const chatMessages = document.getElementById('chat-messages');
+                if (!API_CONFIG.GEMINI_API_KEY) throw new Error('Missing Gemini API Key');
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Analyze this agricultural image. Provide a description and recommendations." }, { inline_data: { mime_type: "image/jpeg", data: base64Image } }] }]
+                    })
+                });
+                const data = await response.json();
+                const analysis = data.candidates[0].content.parts[0].text;
                 chatMessages.removeChild(chatMessages.lastChild);
-                addMessage(`
-                    <div class="error">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>Failed to analyze image: ${error.message}</p>
-                    </div>
-                `, 'ai');
+                addMessage(`<div class="image-analysis"><img src="${e.target.result}" style="width:100%; border-radius:8px; margin-bottom:10px;"><p>${analysis}</p></div>`, 'ai');
+            } catch (err) {
+                chatMessages.removeChild(chatMessages.lastChild);
+                addMessage('Error analyzing image: ' + err.message, 'ai');
             }
-        }
-    });
-}
-
-// Helper function to format analysis text
-function formatAnalysisText(text) {
-    // Split the text into sections
-    const sections = text.split('\n\n');
-    let formattedText = '';
-    
-    sections.forEach(section => {
-        if (section.startsWith('Description:')) {
-            formattedText += `<div class="analysis-section description">
-                <h5>Description</h5>
-                <p>${section.replace('Description:', '').trim()}</p>
-            </div>`;
-        } else if (section.startsWith('Analysis:')) {
-            const points = section.split('\n').slice(1);
-            formattedText += `<div class="analysis-section observations">
-                <h5>Analysis</h5>
-                <ul>${points.map(point => `<li>${point.trim().replace(/^\d+\.\s*/, '')}</li>`).join('')}</ul>
-            </div>`;
-        } else if (section.startsWith('Recommendations:')) {
-            const points = section.split('\n').slice(1);
-            formattedText += `<div class="analysis-section recommendations">
-                <h5>Recommendations</h5>
-                <ul>${points.map(point => `<li>${point.trim().replace(/^\d+\.\s*/, '')}</li>`).join('')}</ul>
-            </div>`;
-        }
-    });
-    
-    return formattedText;
-}
-
-// Add location and time information to AI context
-async function getLocationAndTime() {
-    try {
-        // Get current time (no caching needed as it's always current)
-        const now = new Date();
-        const timeInfo = {
-            time: now.toLocaleTimeString(),
-            date: now.toLocaleDateString(),
-            day: now.toLocaleDateString('en-US', { weekday: 'long' }),
-            hour: now.getHours(),
-            month: now.toLocaleDateString('en-US', { month: 'long' }),
-            season: getSeason(now.getMonth())
         };
+        reader.readAsDataURL(file);
+    });
 
-        // Check if we have valid cached location data
-        const currentTime = Date.now();
-        if (CACHE_CONFIG.location.data && 
-            CACHE_CONFIG.location.timestamp && 
-            (currentTime - CACHE_CONFIG.location.timestamp) < CACHE_CONFIG.location.ttl) {
-            return { timeInfo, locationInfo: CACHE_CONFIG.location.data };
-        }
+    // Market Search
+    const cropSearch = document.getElementById('cropSearch');
+    const searchCrop = document.getElementById('searchCrop');
+    const cropTags = document.querySelectorAll('.crop-tag');
 
-        // Get location if available
-        let locationInfo = null;
-        if (navigator.geolocation) {
-            const position = await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Location request timed out'));
-                }, API_TIMEOUT.location);
-
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        clearTimeout(timeout);
-                        resolve(pos);
-                    },
-                    (err) => {
-                        clearTimeout(timeout);
-                        reject(err);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: API_TIMEOUT.location,
-                        maximumAge: 0
-                    }
-                );
-            });
-
-            // Get location details using reverse geocoding with timeout
-            const locationResponse = await Promise.race([
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Geocoding request timed out')), API_TIMEOUT.location)
-                )
-            ]);
-
-            const locationData = await locationResponse.json();
-            
-            locationInfo = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                city: locationData.address.city || locationData.address.town || locationData.address.village,
-                state: locationData.address.state,
-                country: locationData.address.country,
-                address: locationData.display_name
-            };
-
-            // Cache the location data
-            CACHE_CONFIG.location.data = locationInfo;
-            CACHE_CONFIG.location.timestamp = currentTime;
-        }
-
-        return { timeInfo, locationInfo };
-    } catch (error) {
-        console.error('Error getting location and time:', error);
-        // Return cached data if available, even if expired
-        if (CACHE_CONFIG.location.data) {
-            return { timeInfo: null, locationInfo: CACHE_CONFIG.location.data };
-        }
-        return { timeInfo: null, locationInfo: null };
+    if (searchCrop) {
+        searchCrop.addEventListener('click', () => {
+            const crop = cropSearch.value.trim().toLowerCase();
+            if (crop) updateMarketPrediction(crop);
+        });
     }
+
+    cropTags.forEach(tag => {
+        tag.addEventListener('click', () => {
+            const crop = tag.textContent.trim().toLowerCase();
+            cropSearch.value = crop;
+            updateMarketPrediction(crop);
+        });
+    });
 }
 
-// Helper function to determine season
-function getSeason(month) {
-    if (month >= 2 && month <= 4) return 'spring';
-    if (month >= 5 && month <= 7) return 'summer';
-    if (month >= 8 && month <= 10) return 'autumn';
-    return 'winter';
-}
-
-// Handle user input with better formatting
+// AI Handling
 async function handleUserInput(input) {
-    // Show immediate feedback
     addMessage(input, 'user');
-    
+    const typingIndicator = document.createElement('div');
+    typingIndicator.classList.add('message', 'ai-message');
+    typingIndicator.innerHTML = '<div class="message-content typing">GreenGrok is typing...</div>';
+    chatMessages.appendChild(typingIndicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
     try {
-        // Show typing indicator immediately
-        const typingIndicator = document.createElement('div');
-        typingIndicator.classList.add('message', 'ai-message');
-        typingIndicator.innerHTML = '<div class="message-content typing">GreenGrok is typing...</div>';
-        chatMessages.appendChild(typingIndicator);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        // Get location and time information in parallel with other operations
-        const locationAndTimePromise = getLocationAndTime();
-        
-        // Create context string with reduced history
-        let context = '';
-        const { timeInfo, locationInfo } = await locationAndTimePromise;
-        
-        if (timeInfo) {
-            context += `Current time: ${timeInfo.time}, Date: ${timeInfo.date}, Season: ${timeInfo.season}. `;
-        }
-        if (locationInfo) {
-            context += `Location: ${locationInfo.city}, ${locationInfo.state}. `;
-        }
-
-        // Add complete chat history to context
-        if (chatHistory.length > 0) {
-            context += '\nChat History:\n';
-            chatHistory.forEach((message) => {
-                const prefix = message.role === 'user' ? 'User' : 'Assistant';
-                context += `${prefix}: ${message.content}\n`;
-            });
-        }
-
-        if (!API_CONFIG.GEMINI_API_KEY) {
-            throw new Error('Gemini API key not configured. Please add it in settings.');
-        }
-
-        // Make Gemini API call with timeout
-        const geminiResponse = await Promise.race([
-            fetch(`https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `You are GreenGrok, an agricultural assistant. 
-                                   Context: ${context}
-                                   Question: "${input}"
-                                   Format: Main Answer, Key Points, Recommendations.
-                                   Keep response focused on agriculture.`
-                        }]
-                    }]
-                }),
-            }),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Gemini API request timed out')), API_TIMEOUT.gemini)
-            )
-        ]);
-        
-        if (!geminiResponse.ok) {
-            const errorData = await geminiResponse.json();
-            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
-        }
-        
-        const data = await geminiResponse.json();
-        
-        // Remove typing indicator
+        if (!API_CONFIG.GEMINI_API_KEY) throw new Error('Gemini API key not configured');
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.model}:generateContent?key=${API_CONFIG.GEMINI_API_KEY}`, {
+            method: 'POST',
+            body: JSON.stringify({ contents: [{ parts: [{ text: `You are GreenGrok, an agricultural assistant. User asks: ${input}` }] }] })
+        });
+        const data = await response.json();
         chatMessages.removeChild(typingIndicator);
-        
-        if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-            throw new Error('Invalid response format from Gemini API');
-        }
-        
-        // Extract and format the response
-        const generatedText = data.candidates[0].content.parts[0].text.replace(/\*\*/g, '');
-        
-        // Add AI response to chat history
-        chatHistory.push({ role: 'assistant', content: generatedText });
-        
-        // Format the response for display
-        const formattedResponse = generatedText
-            .split('\n')
-            .map(line => {
-                if (line.startsWith('Main Answer:')) {
-                    return `<p class="main-answer">${line.replace('Main Answer:', '').trim()}</p>`;
-                } else if (line.startsWith('Key Points:')) {
-                    const points = line.replace('Key Points:', '').trim().split('.');
-                    return `<ul class="key-points">${points.map(point => point.trim()).filter(point => point).map(point => `<li>${point}</li>`).join('')}</ul>`;
-                } else if (line.startsWith('Recommendations:')) {
-                    const points = line.replace('Recommendations:', '').trim().split('.');
-                    return `<ul class="recommendations">${points.map(point => point.trim()).filter(point => point).map(point => `<li>${point}</li>`).join('')}</ul>`;
-                } else {
-                    return `<p>${line}</p>`;
-                }
-            })
-            .join('');
-        
-        // Add the AI response to the chat
-        addMessage(formattedResponse, 'ai');
-        
-        if (isVoiceMode) {
-            // Create a concise version for voice
-            const mainAnswer = generatedText.split('Main Answer:')[1]?.split('Key Points:')[0]?.trim() || '';
-            const recommendations = generatedText.split('Recommendations:')[1]?.trim() || '';
-            const voiceText = `${mainAnswer}. ${recommendations}`;
-            
-            // Reduced delay before speaking
-            setTimeout(() => {
-                speakResponse(voiceText);
-            }, 100);
-        }
+        const text = data.candidates[0].content.parts[0].text;
+        addMessage(text, 'ai');
+        if (isVoiceMode) speakResponse(text);
     } catch (error) {
-        console.error('Error getting AI response:', error);
-        // Remove typing indicator if it exists
-        const typingIndicator = document.querySelector('.typing');
-        if (typingIndicator) {
-            typingIndicator.parentElement.parentElement.remove();
-        }
-        
-        const errorMessage = `I'm having trouble processing your request. ${error.message}. Please try again or check your API configuration.`;
-        addMessage(errorMessage, 'ai');
-        if (isVoiceMode) {
-            speakResponse(errorMessage);
-        }
+        chatMessages.removeChild(typingIndicator);
+        addMessage('Error: ' + error.message, 'ai');
     }
 }
 
-// Update welcome message to be simpler
 function addWelcomeMessage() {
-    const welcomeMessage = "Hello! I'm GreenGrok, your agricultural assistant created by the BINERY BEAST TEAM. How can I help you with your agricultural needs today?";
-    addMessage(welcomeMessage, 'ai', false);
-    
-    if (isVoiceMode) {
-        speakResponse(welcomeMessage);
-    }
+    addMessage("Hello! I'm GreenGrok, your agricultural assistant. How can I help you today?", 'ai', false);
 }
 
-// Settings Modal Logic
+// Settings
 function setupSettingsModal() {
     const modal = document.getElementById('settings-modal');
-    const closeBtn = document.querySelector('.close-modal');
-    const saveBtn = document.getElementById('save-settings');
-
     const geminiInput = document.getElementById('gemini-key');
     const weatherInput = document.getElementById('weather-key');
     const ogdInput = document.getElementById('ogd-key');
 
-    // Load existing keys into inputs
     geminiInput.value = API_CONFIG.GEMINI_API_KEY;
     weatherInput.value = API_CONFIG.WEATHER_API_KEY;
     ogdInput.value = API_CONFIG.OGD_API_KEY;
 
-    closeBtn.onclick = () => modal.style.display = 'none';
-    window.onclick = (event) => {
-        if (event.target == modal) modal.style.display = 'none';
-    };
+    document.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    document.getElementById('save-settings').onclick = () => {
+        API_CONFIG.GEMINI_API_KEY = geminiInput.value.trim();
+        API_CONFIG.WEATHER_API_KEY = weatherInput.value.trim();
+        API_CONFIG.OGD_API_KEY = ogdInput.value.trim();
 
-    saveBtn.onclick = () => {
-        const geminiKey = geminiInput.value.trim();
-        const weatherKey = weatherInput.value.trim();
-        const ogdKey = ogdInput.value.trim();
-
-        localStorage.setItem('gemini_api_key', geminiKey);
-        localStorage.setItem('weather_api_key', weatherKey);
-        localStorage.setItem('ogd_api_key', ogdKey);
-
-        API_CONFIG.GEMINI_API_KEY = geminiKey;
-        API_CONFIG.WEATHER_API_KEY = weatherKey;
-        API_CONFIG.OGD_API_KEY = ogdKey;
+        localStorage.setItem('gemini_api_key', API_CONFIG.GEMINI_API_KEY);
+        localStorage.setItem('weather_api_key', API_CONFIG.WEATHER_API_KEY);
+        localStorage.setItem('ogd_api_key', API_CONFIG.OGD_API_KEY);
 
         modal.style.display = 'none';
-
-        // Refresh weather with new key if provided
-        if (weatherKey) {
-            getLocationAndUpdateWeather();
-        }
-
-        alert('Settings saved successfully!');
+        updateWeather();
+        alert('Settings saved!');
     };
 }
 
-function clearImage() {
-    imageUpload.value = '';
-    imagePreview.innerHTML = '';
-}
-
-async function fetchMarketData(cropName) {
-    try {
-        // Convert crop name to lowercase for case-insensitive matching
-        const crop = cropName.toLowerCase();
-        
-        // Check if we have data for this crop
-        if (INDIAN_MARKET_DATA[crop]) {
-            return INDIAN_MARKET_DATA[crop];
-        }
-        
-        // If no exact match, try to find a partial match
-        const matchingCrop = Object.keys(INDIAN_MARKET_DATA).find(key => 
-            key.includes(crop) || crop.includes(key)
-        );
-        
-        if (matchingCrop) {
-            return INDIAN_MARKET_DATA[matchingCrop];
-        }
-        
-        throw new Error('Crop not found in database');
-    } catch (error) {
-        console.error('Error fetching market data:', error);
-        throw error;
-    }
-}
-
-// Function to get market data based on user's location
-async function getMarketDataByLocation(crop, latitude, longitude) {
-    try {
-        // First, get the user's district/city based on coordinates
-        const locationResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-        const locationData = await locationResponse.json();
-        
-        const userDistrict = locationData.address.district || locationData.address.city || 'Local Market';
-        const userState = locationData.address.state || 'India';
-
-        // Get market data for the crop
-        const marketData = INDIAN_MARKET_DATA[crop.toLowerCase()];
-        if (!marketData) {
-            throw new Error('Crop not found in database');
-        }
-
-        // Adjust prices based on location (this is a simplified example)
-        // In a real application, you would fetch actual prices from a market API
-        const locationFactor = 1.0; // Base factor
-        const adjustedPrice = Math.round(parseFloat(marketData.currentPrice.replace(/,/g, '')) * locationFactor);
-        const adjustedPredictedPrice = Math.round(parseFloat(marketData.predictedPrice.replace(/,/g, '')) * locationFactor);
-        const adjustedLastWeekPrice = Math.round(parseFloat(marketData.lastWeekPrice.replace(/,/g, '')) * locationFactor);
-        const adjustedLastMonthPrice = Math.round(parseFloat(marketData.lastMonthPrice.replace(/,/g, '')) * locationFactor);
-
-        return {
-            ...marketData,
-            currentPrice: adjustedPrice.toLocaleString('en-IN'),
-            predictedPrice: adjustedPredictedPrice.toLocaleString('en-IN'),
-            lastWeekPrice: adjustedLastWeekPrice.toLocaleString('en-IN'),
-            lastMonthPrice: adjustedLastMonthPrice.toLocaleString('en-IN'),
-            market: userDistrict,
-            state: userState
-        };
-    } catch (error) {
-        console.error('Error getting market data by location:', error);
-        throw error;
-    }
-}
-
-// Enhanced market prediction function
+// Market Logic
 async function updateMarketPrediction(crop) {
-    // Show loading state in chat
-    addMessage('<div class="loading">Fetching market data...</div>', 'ai');
-    
+    addMessage('<div class="loading">Fetching market data for ' + crop + '...</div>', 'ai');
     try {
-        // Try to get user's location with a timeout
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(
-                resolve,
-                reject,
-                { 
-                    timeout: 5000,
-                    maximumAge: 0,
-                    enableHighAccuracy: true 
-                }
-            );
-        });
-
-        const { latitude, longitude } = position.coords;
-        const marketData = await getMarketDataByLocation(crop, latitude, longitude);
-        displayMarketData(crop, marketData);
-    } catch (error) {
-        const chatMessages = document.getElementById('chat-messages');
-        if (chatMessages && chatMessages.lastChild) {
-            chatMessages.removeChild(chatMessages.lastChild);
-        }
+        // In a real app, use API_CONFIG.OGD_API_KEY here to fetch from data.gov.in
+        // Example: const resp = await fetch(`https://api.data.gov.in/resource/...&api-key=${API_CONFIG.OGD_API_KEY}`);
         
-        if (error.code === error.PERMISSION_DENIED) {
-            // If location access is denied, use default market data
-            try {
-                const defaultMarketData = await fetchMarketData(crop);
-                displayMarketData(crop, {
-                    ...defaultMarketData,
-                    market: 'National Average',
-                    state: 'India'
-                });
-                
-                // Add a note about location access
-                addMessage(`
-                    <div class="info-message">
-                        <i class="fas fa-info-circle"></i>
-                        <p>Showing national average prices. Enable location access for local market prices.</p>
-                    </div>
-                `, 'ai');
-            } catch (fetchError) {
-                addMessage(`
-                    <div class="error">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>Failed to fetch market data: ${fetchError.message}</p>
-                    </div>
-                `, 'ai');
-            }
+        const data = INDIAN_MARKET_DATA[crop] || Object.values(INDIAN_MARKET_DATA).find(d => d.market.toLowerCase().includes(crop));
+        chatMessages.removeChild(chatMessages.lastChild);
+
+        if (data) {
+            displayMarketData(crop, data);
         } else {
-            addMessage(`
-                <div class="error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <p>Failed to fetch market data: ${error.message}</p>
-                </div>
-            `, 'ai');
+            addMessage('No specific data found for ' + crop + '. Showing general agricultural trends.', 'ai');
         }
+    } catch (err) {
+        chatMessages.removeChild(chatMessages.lastChild);
+        addMessage('Error: ' + err.message, 'ai');
     }
 }
 
-// Helper function to display market data
 function displayMarketData(crop, marketData) {
-    if (!marketData) {
-        addMessage(`
-            <div class="error">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>No market data available for ${crop}</p>
-            </div>
-        `, 'ai');
-        return;
-    }
-
     const chartId = `chart-${Date.now()}`;
-    const formattedMessage = `
+    const html = `
         <div class="market-analysis-container">
-            <div class="market-header">
-                <h4>Market Analysis for ${crop.charAt(0).toUpperCase() + crop.slice(1)}</h4>
-                <div class="market-location">
-                    <i class="fas fa-map-marker-alt"></i>
-                    ${marketData.market}, ${marketData.state}
-                </div>
+            <div class="market-header" style="background:var(--primary-color); color:white; padding:10px; border-radius:8px 8px 0 0;">
+                <h4>Market Analysis: ${crop.toUpperCase()}</h4>
+                <small>${marketData.market}, ${marketData.state}</small>
             </div>
-            <div class="market-chart-container" style="padding: 20px; background: white; margin: 10px; border-radius: 12px;">
-                <canvas id="${chartId}"></canvas>
-            </div>
-            <div class="market-prices">
-                <div class="price-item">
-                    <span class="price-label">Current Price</span>
-                    <span class="price-value">₹${marketData.currentPrice}</span>
-                    <span class="price-unit">${marketData.unit}</span>
+            <div style="padding:15px; background:var(--card-bg); border:1px solid var(--border-color); border-top:none; border-radius:0 0 8px 8px;">
+                <canvas id="${chartId}" height="150"></canvas>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
+                    <div><strong>Current:</strong> ₹${marketData.currentPrice}</div>
+                    <div><strong>Predicted:</strong> ₹${marketData.predictedPrice}</div>
                 </div>
-                <div class="price-item">
-                    <span class="price-label">Predicted Price</span>
-                    <span class="price-value">₹${marketData.predictedPrice}</span>
-                    <span class="price-unit">${marketData.unit}</span>
-                </div>
-                <div class="price-item">
-                    <span class="price-label">Last Week</span>
-                    <span class="price-value">₹${marketData.lastWeekPrice}</span>
-                    <span class="price-unit">${marketData.unit}</span>
-                </div>
-                <div class="price-item">
-                    <span class="price-label">Last Month</span>
-                    <span class="price-value">₹${marketData.lastMonthPrice}</span>
-                    <span class="price-unit">${marketData.unit}</span>
-                </div>
-                <div class="trend-indicator ${marketData.trend}">
-                    <i class="fas fa-arrow-${marketData.trend}"></i>
-                    <span class="trend-text">${marketData.trendPercentage}% ${marketData.trend === 'up' ? 'increase' : 'decrease'}</span>
-                </div>
-            </div>
-            <div class="market-details">
-                <div class="detail-item">
-                    <span class="detail-label">Market Volume:</span>
-                    <span class="detail-value">${marketData.marketVolume}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Quality:</span>
-                    <span class="detail-value">${marketData.quality}</span>
-                </div>
-            </div>
-            <div class="market-recommendation">
-                <h5>Recommendation</h5>
-                <p>${marketData.recommendation}</p>
-            </div>
-            <div class="market-update-time">
-                <i class="fas fa-clock"></i>
-                Last updated: ${new Date().toLocaleTimeString()}
+                <p style="margin-top:10px; font-size:0.9rem;">${marketData.recommendation}</p>
             </div>
         </div>
     `;
+    addMessage(html, 'ai');
 
-    addMessage(formattedMessage, 'ai');
-
-    // Initialize the chart after the message is added to DOM
     setTimeout(() => {
-        const ctx = document.getElementById(chartId).getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Last Month', 'Last Week', 'Current', 'Predicted'],
-                datasets: [{
-                    label: 'Price (₹)',
-                    data: [
-                        parseFloat(marketData.lastMonthPrice.replace(/,/g, '')),
-                        parseFloat(marketData.lastWeekPrice.replace(/,/g, '')),
-                        parseFloat(marketData.currentPrice.replace(/,/g, '')),
-                        parseFloat(marketData.predictedPrice.replace(/,/g, ''))
-                    ],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#10b981',
-                    pointRadius: 6,
-                    pointHoverRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
+        const el = document.getElementById(chartId);
+        if (el && window.Chart) {
+            new Chart(el.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['Past', 'Current', 'Future'],
+                    datasets: [{
+                        data: [parseFloat(marketData.lastWeekPrice.replace(/,/g,'')), parseFloat(marketData.currentPrice.replace(/,/g,'')), parseFloat(marketData.predictedPrice.replace(/,/g,''))],
+                        borderColor: '#10b981',
+                        tension: 0.4
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        grid: { color: '#f3f4f6' }
-                    },
-                    x: {
-                        grid: { display: false }
-                    }
-                }
-            }
-        });
-    }, 100);
-
-    if (isVoiceMode) {
-        speakResponse(`Market analysis for ${crop} in ${marketData.market}. Current price is ₹${marketData.currentPrice} per ${marketData.unit}. 
-            ${marketData.trendPercentage}% ${marketData.trend === 'up' ? 'increase' : 'decrease'}. 
-            ${marketData.recommendation}`);
-    }
-}
-
-// Add event listeners for market price prediction
-document.addEventListener('DOMContentLoaded', () => {
-    const cropSearch = document.getElementById('cropSearch');
-    const searchButton = document.getElementById('searchCrop');
-    const cropTags = document.querySelectorAll('.crop-tag');
-
-    // Handle search button click
-    if (searchButton) {
-        searchButton.addEventListener('click', () => {
-            const crop = cropSearch.value.trim().toLowerCase();
-            if (crop) {
-                updateMarketPrediction(crop);
-            } else {
-                addMessage(`
-                    <div class="error">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>Please enter a crop name to search</p>
-                    </div>
-                `, 'ai');
-            }
-        });
-    }
-
-    // Handle Enter key in search input
-    if (cropSearch) {
-        cropSearch.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const crop = cropSearch.value.trim().toLowerCase();
-                if (crop) {
-                    updateMarketPrediction(crop);
-                } else {
-                    addMessage(`
-                        <div class="error">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <p>Please enter a crop name to search</p>
-                        </div>
-                    `, 'ai');
-                }
-            }
-        });
-    }
-
-    // Handle crop tag clicks
-    if (cropTags.length > 0) {
-        cropTags.forEach(tag => {
-            tag.addEventListener('click', () => {
-                const crop = tag.textContent.trim().toLowerCase();
-                if (cropSearch) {
-                    cropSearch.value = crop;
-                }
-                updateMarketPrediction(crop);
+                options: { plugins: { legend: { display: false } } }
             });
-        });
-    }
-
-    // Add autocomplete functionality
-    cropSearch.addEventListener('input', () => {
-        const searchTerm = cropSearch.value.trim().toLowerCase();
-        cropTags.forEach(tag => {
-            const cropName = tag.textContent.trim().toLowerCase();
-            if (cropName.includes(searchTerm)) {
-                tag.style.display = 'inline-block';
-            } else {
-                tag.style.display = 'none';
-            }
-        });
-    });
-
-    // Add seasonal tips
-    addSeasonalTips();
-});
+        }
+    }, 100);
+}
 
 function addSeasonalTips() {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const currentMonth = new Date().getMonth();
     const seasonalTips = {
-        0: "January: Best time for harvesting sugarcane and sowing late-season wheat.",
-        1: "February: Ideal for planting summer vegetables and monitoring mustard crops.",
-        2: "March: Wheat harvesting begins. Start preparing soil for cotton.",
-        3: "April: Peak wheat harvesting season. Good for sowing moong and sunflower.",
-        4: "May: Soil preparation for Kharif crops. Sowing of cotton and maize.",
-        5: "June: Monsoon arrives. Peak sowing time for rice, soybean, and pulses.",
-        6: "July: Transplanting rice and weeding of early-sown crops.",
-        7: "August: Top-dressing of fertilizers in rice and maize.",
-        8: "September: Harvesting of short-duration crops. Monitoring for pests.",
-        9: "October: Sowing of Rabi crops like wheat, mustard, and gram.",
-        10: "November: Peak sowing time for wheat. Harvesting of rice.",
-        11: "December: Irrigation of wheat and mustard. Harvesting of cotton."
+        0: "January: Harvest sugarcane, sow late wheat.",
+        1: "February: Plant summer vegetables.",
+        2: "March: Wheat harvesting begins.",
+        3: "April: Peak wheat harvesting.",
+        4: "May: Prepare soil for Kharif.",
+        5: "June: Rice sowing starts.",
+        6: "July: Rice transplanting.",
+        7: "August: Apply fertilizers.",
+        8: "September: Harvest short crops.",
+        9: "October: Sow Rabi crops (wheat, mustard).",
+        10: "November: Peak wheat sowing.",
+        11: "December: Irrigate wheat."
     };
-
-    const sidebar = document.querySelector('.sidebar');
-    const tipWidget = document.createElement('div');
-    tipWidget.className = 'widget seasonal-tips';
-    tipWidget.innerHTML = `
-        <h3><i class="fas fa-calendar-alt"></i> ${months[currentMonth]} Tips</h3>
-        <p>${seasonalTips[currentMonth]}</p>
-        <div style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
-            <i class="fas fa-info-circle"></i> Based on Indian agricultural cycle.
-        </div>
-    `;
-    sidebar.appendChild(tipWidget);
+    const month = new Date().getMonth();
+    const widget = document.createElement('div');
+    widget.className = 'widget';
+    widget.innerHTML = `<h3><i class="fas fa-calendar"></i> Seasonal Tips</h3><p>${seasonalTips[month]}</p>`;
+    document.querySelector('.sidebar').appendChild(widget);
 }
-
-// Add event listener for the chat input microphone button
-document.addEventListener('DOMContentLoaded', function() {
-    const voiceBtn = document.getElementById('voice-btn');
-    if (voiceBtn) {
-        voiceBtn.addEventListener('click', function() {
-            if (!recognition) {
-                initializeVoiceRecognition();
-            }
-
-            if (isListening) {
-                recognition.stop();
-            } else {
-                try {
-                    recognition.start();
-                } catch (error) {
-                    console.error('Error starting voice recognition:', error);
-                    alert('Error starting voice recognition. Please try again.');
-                }
-            }
-        });
-    }
-});
-
-// Add keyboard shortcut to stop speaking
-document.addEventListener('keydown', function(event) {
-    if (event.ctrlKey && synthesis) {
-        synthesis.cancel();
-        if (isVoiceMode && twoWayRecognition) {
-            twoWayRecognition.start();
-        }
-    }
-}); 
