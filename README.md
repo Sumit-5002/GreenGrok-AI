@@ -6,99 +6,32 @@ GreenGrok is a web-based agricultural assistant that provides personalized farmi
 ## Features
 
 ### 1. Multilingual Support
-GreenGrok supports 5 Indian languages with automatic language detection and response:
-
-1. **English** (en)
-   - Indian English accent
-   - Preferred voices: Google हिन्दी, Microsoft Ravi, Microsoft Heera
-
-2. **Hindi** (hi)
-   - Native Hindi support
-   - Preferred voices: Google हिन्दी, Microsoft Ravi, Microsoft Heera
-
-3. **Marathi** (mr)
-   - Native Marathi support
-   - Preferred voices: Google मराठी, Microsoft Gopal
-
-4. **Tamil** (ta)
-   - Native Tamil support
-   - Preferred voices: Google தமிழ், Microsoft Valluvar
-
-5. **Telugu** (te)
-   - Native Telugu support
-   - Preferred voices: Google తెలుగు, Microsoft Chitra
-
-The system automatically:
-- Detects the input language
-- Responds in the same language
-- Uses appropriate regional voices for speech output
+GreenGrok supports multiple Indian languages with automatic language detection and response:
+- **English**, **Hindi**, **Marathi**, **Tamil**, **Telugu**
+- The system automatically detects input language and responds in kind.
 
 ### 2. Intelligent Chat Interface
-- Natural language processing for understanding agricultural queries
-- Multilingual support (English, Hindi, Marathi, Tamil, Telugu)
-- Context-aware responses with chat history
-- Voice input and output capabilities
+- Modern, glassmorphism-inspired UI with dark mode support.
+- Context-aware responses with chat history persistence.
+- Markdown rendering for clear, formatted advice.
+- Voice input and text-to-speech output.
 
 ### 3. Weather Information
-- Real-time weather updates
-- Location-based weather data
-- Agricultural weather recommendations
-- Temperature, humidity, wind speed, and precipitation information
+- Real-time location-based weather updates.
+- Agricultural recommendations based on current conditions.
+- Detailed metrics: Temperature, humidity, wind, pressure, and visibility.
 
 ### 4. Market Price Analysis
-- Real-time crop price information
-- Price trends and predictions
-- Location-specific market data
-- Historical price comparison
-- Market recommendations
+- Real-time crop price trends and predictions.
+- Interactive charts (via Chart.js) for price visualization.
+- Location-specific market data for various Indian crops.
 
 ### 5. Image Analysis
-- Plant disease detection
-- Soil condition analysis
-- Crop health monitoring
-- Pest identification
-- Growth stage analysis
+- Analyze crop health, pests, and soil conditions via image uploads.
+- Powered by Gemini 1.5 Flash for fast and accurate vision analysis.
 
-### 6. Voice Interaction
-- Voice-to-text input
-- Text-to-speech output
-- Multilingual voice support
-- Hands-free operation
-
-### 7. Agricultural Knowledge Base
-- Crop management advice
-- Pest control recommendations
-- Soil health information
-- Seasonal farming guidance
-- Best practices for different crops
-
-## 🛠️ System Requirements
-
-### Hardware Requirements
-- Modern web browser (Chrome, Firefox, Edge, Safari)
-- Internet connection
-- Microphone (for voice features)
-- Speakers (for voice output)
-- Minimum 2GB RAM
-- 100MB free disk space
-
-### Software Requirements
-- Web Browser:
-  - Chrome 80+ (recommended)
-  - Firefox 75+
-  - Edge 80+
-  - Safari 13+
-- Operating System:
-  - Windows 10/11
-  - macOS 10.15+
-  - Linux (Ubuntu 20.04+)
-  - Android 10+
-  - iOS 13+
-
-### API Requirements
-- OpenWeatherMap API key (for weather data)
-- Google Gemini API key (for AI capabilities)
-- Open Government Data API key (for market prices)
+### 6. Seasonal Tips
+- Monthly agricultural tips tailored to the Indian farming cycle.
 
 ## 🚀 Getting Started
 
@@ -109,100 +42,37 @@ git clone https://github.com/yourusername/greengrok.git
 cd greengrok
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
 ### 2. Configuration
-1. Create a `.env` file in the root directory
-2. Add your API keys:
-```
-WEATHER_API_KEY=your_openweathermap_api_key
-GEMINI_API_KEY=your_gemini_api_key
-OGD_API_KEY=your_ogd_api_key
-```
+GreenGrok features an in-app **API Settings** panel. No `.env` file is required.
+
+1. Open `index.html` in your browser.
+2. Click the **Gear icon (⚙️)** in the header.
+3. Enter your API keys:
+   - **Google Gemini API Key** (from [Google AI Studio](https://aistudio.google.com/app/apikey))
+   - **OpenWeatherMap API Key** (from [OpenWeatherMap](https://openweathermap.org/api))
+   - **OGD India API Key** (from [Data.gov.in](https://data.gov.in/))
+4. Click **Save Settings**. Your keys are stored securely in your browser's local storage.
 
 ### 3. Running the Application
-1. Start the development server:
-```bash
-npm start
-```
-
-2. Open your browser and navigate to:
-```
-http://localhost:3000
-```
-
-## 🔑 API Keys Setup
-
-### 1. OpenWeatherMap API
-1. Sign up at [OpenWeatherMap](https://openweathermap.org/api)
-2. Get your API key from the dashboard
-3. Add it to your `.env` file
-
-### 2. Google Gemini API
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Add it to your `.env` file
-
-### 3. Open Government Data API
-1. Register at [Data.gov.in](https://data.gov.in/)
-2. Generate an API key
-3. Add it to your `.env` file
+Simply open `index.html` in any modern web browser. For the best experience, use a local server like "Live Server" in VS Code.
 
 ## 📱 Usage Guide
-
-### Basic Usage
-1. Type your question in the chat input
-2. Press Enter or click Send
-3. Receive AI-powered response
-
-### Voice Commands
-1. Click the microphone icon
-2. Speak your query
-3. Wait for the response
-
-### Image Analysis
-1. Click the upload button
-2. Select an image of crops, soil, or plants
-3. Receive detailed analysis
-
-### Market Price Check
-1. Enter crop name in the search box
-2. View current prices and trends
-3. Get market recommendations
+- **Chat**: Type or use the microphone to ask agricultural questions.
+- **New Chat**: Click the **+** icon to clear history and start fresh.
+- **Export**: Click the download icon to save your conversation.
+- **Images**: Upload photos of your crops for AI diagnosis.
+- **Market**: Search for crops to see price trends and charts.
 
 ## 🔒 Security
-
-- All API keys are stored securely
-- HTTPS encryption for all communications
-- No personal data storage
-- Regular security updates
+- All API keys are stored only in your browser's `localStorage`.
+- No server-side storage of personal data.
 
 ## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-For support, email sumitboy2005@gmail.com or create an issue in the GitHub repository.
-
-## 🙏 Acknowledgments
-
-- OpenWeatherMap for weather data
-- Google for Gemini AI
-- Data.gov.in for market data
-- All contributors and users
+1. Fork the repository.
+2. Create your feature branch.
+3. Commit your changes.
+4. Push to the branch.
+5. Create a Pull Request.
 
 ---
-
-Made with ❤️ by the BINERY BEAST TEAM 
+Made with ❤️ by the BINERY BEAST TEAM

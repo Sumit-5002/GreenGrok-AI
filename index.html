@@ -6,26 +6,39 @@
     <title>GreenGrok - Agricultural Assistant</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body class="light-mode">
     <div class="container">
         <!-- Header Section -->
         <header>
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-leaf"></i>
+            <div class="header-left">
+                <button id="sidebar-toggle" class="icon-btn mobile-only" title="Toggle Sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-leaf"></i>
+                    </div>
+                    <h1>GreenGrok</h1>
                 </div>
-                <h1>GreenGrok</h1>
             </div>
             <div class="header-controls">
-                <div class="mode-toggle">
+                <button class="icon-btn" id="new-chat-btn" title="New Chat">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="icon-btn" id="export-chat-btn" title="Export Chat">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="icon-btn settings-toggle" id="settings-btn" title="API Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button class="icon-btn mode-toggle" title="Toggle Theme">
                     <i class="fas fa-moon"></i>
-                    <span>Dark Mode</span>
-                </div>
-                <div class="voice-toggle">
+                </button>
+                <button class="icon-btn voice-toggle" title="Toggle Voice Mode">
                     <i class="fas fa-microphone"></i>
-                    <span>Voice Mode</span>
-                </div>
+                </button>
             </div>
         </header>
 
@@ -128,8 +141,39 @@
         </main>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-key"></i> API Settings</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <p class="settings-help">Enter your API keys to enable GreenGrok's full capabilities. These keys are stored locally in your browser.</p>
+            <div class="settings-form">
+                <div class="form-group">
+                    <label for="gemini-key">Google Gemini API Key</label>
+                    <input type="password" id="gemini-key" placeholder="Enter Gemini API Key">
+                    <small>Get it from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></small>
+                </div>
+                <div class="form-group">
+                    <label for="weather-key">OpenWeatherMap API Key</label>
+                    <input type="password" id="weather-key" placeholder="Enter OpenWeatherMap API Key">
+                    <small>Get it from <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></small>
+                </div>
+                <div class="form-group">
+                    <label for="ogd-key">OGD India API Key</label>
+                    <input type="password" id="ogd-key" placeholder="Enter OGD India API Key">
+                    <small>Get it from <a href="https://data.gov.in/" target="_blank">Data.gov.in</a></small>
+                </div>
+                <button id="save-settings" class="save-btn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html> 
