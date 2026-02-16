@@ -540,14 +540,20 @@ function initializeVoiceRecognition() {
 
         recognition.onstart = function() {
             isListening = true;
-            if (voiceBtn) voiceBtn.classList.add('voice-active');
+            if (voiceBtn) {
+                voiceBtn.classList.add('voice-active');
+                voiceBtn.setAttribute('aria-pressed', 'true');
+            }
             userInput.placeholder = "Listening...";
             userInput.classList.add('listening');
         };
 
         recognition.onend = function() {
             isListening = false;
-            if (voiceBtn) voiceBtn.classList.remove('voice-active');
+            if (voiceBtn) {
+                voiceBtn.classList.remove('voice-active');
+                voiceBtn.setAttribute('aria-pressed', 'false');
+            }
             userInput.placeholder = `Ask GreenGrok about agriculture...`;
             userInput.classList.remove('listening');
         };
@@ -636,6 +642,7 @@ function initializeTwoWayCommunication() {
 function toggleVoiceMode() {
     isVoiceMode = !isVoiceMode;
     const voiceIcon = voiceToggle.querySelector('i');
+    voiceToggle.setAttribute('aria-pressed', isVoiceMode);
     
     if (isVoiceMode) {
         voiceIcon.classList.remove('fa-microphone');
@@ -812,7 +819,7 @@ function setupEventListeners() {
                 const data = await response.json();
                 const analysis = data.candidates[0].content.parts[0].text;
                 chatMessages.removeChild(chatMessages.lastChild);
-                addMessage(`<div class="image-analysis"><img src="${e.target.result}" style="width:100%; border-radius:8px; margin-bottom:10px;"><p>${analysis}</p></div>`, 'ai');
+                addMessage(`<div class="image-analysis"><img src="${e.target.result}" alt="Uploaded agricultural image for analysis" style="width:100%; border-radius:8px; margin-bottom:10px;"><p>${analysis}</p></div>`, 'ai');
             } catch (err) {
                 chatMessages.removeChild(chatMessages.lastChild);
                 addMessage('Error analyzing image: ' + err.message, 'ai');
@@ -883,7 +890,15 @@ function setupSettingsModal() {
     weatherInput.value = API_CONFIG.WEATHER_API_KEY;
     ogdInput.value = API_CONFIG.OGD_API_KEY;
 
-    document.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    const closeModal = document.querySelector('.close-modal');
+    const closeSettings = () => modal.style.display = 'none';
+    closeModal.onclick = closeSettings;
+    closeModal.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            closeSettings();
+        }
+    };
     document.getElementById('save-settings').onclick = () => {
         API_CONFIG.GEMINI_API_KEY = geminiInput.value.trim();
         API_CONFIG.WEATHER_API_KEY = weatherInput.value.trim();
@@ -929,7 +944,7 @@ function displayMarketData(crop, marketData) {
                 <small>${marketData.market}, ${marketData.state}</small>
             </div>
             <div style="padding:15px; background:var(--card-bg); border:1px solid var(--border-color); border-top:none; border-radius:0 0 8px 8px;">
-                <canvas id="${chartId}" height="150"></canvas>
+                <canvas id="${chartId}" height="150" role="img" aria-label="Price trend chart for ${crop}"></canvas>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
                     <div><strong>Current:</strong> ₹${marketData.currentPrice}</div>
                     <div><strong>Predicted:</strong> ₹${marketData.predictedPrice}</div>
