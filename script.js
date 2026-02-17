@@ -500,7 +500,20 @@ function addMessage(text, sender, save = true) {
         chatMessages.appendChild(messageDiv);
     } else {
         // Use marked for markdown rendering
-        const htmlContent = window.marked ? marked.parse(text) : text;
+        const rawHtml = window.marked ? marked.parse(text) : text;
+        // Sanitize HTML content to prevent XSS. Fallback to escaped text if DOMPurify is missing.
+        const htmlContent = window.DOMPurify ? DOMPurify.sanitize(rawHtml, {
+            ADD_TAGS: ['canvas'],
+            ADD_ATTR: ['id']
+        }) : text.replace(/[&<>"']/g, function(m) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[m];
+        });
 
         if (save) {
             // Typing effect for new AI messages
