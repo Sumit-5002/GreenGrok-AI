@@ -718,6 +718,7 @@ async function updateWeather() {
         console.error('Weather error:', error);
         document.querySelector('.temperature').textContent = 'N/A';
         document.querySelector('.condition').textContent = 'Check API Key';
+        document.querySelector('.recommendation p').textContent = 'Please configure your OpenWeatherMap API key in settings to see local weather and recommendations.';
     }
 }
 
@@ -726,9 +727,30 @@ function updateWeatherUI(data) {
     document.querySelector('.condition').textContent = data.weather[0].description;
     document.querySelector('.humidity').innerHTML = `<i class="fas fa-tint"></i> ${data.main.humidity}%`;
     document.querySelector('.wind').innerHTML = `<i class="fas fa-wind"></i> ${Math.round(data.wind.speed * 3.6)} km/h`;
+    document.querySelector('.pressure').innerHTML = `<i class="fas fa-compress-arrows-alt"></i> ${data.main.pressure} hPa`;
+    document.querySelector('.visibility').innerHTML = `<i class="fas fa-eye"></i> ${data.visibility / 1000} km`;
+
+    const sunrise = new Date(data.sys.sunrise * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const sunset = new Date(data.sys.sunset * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    document.querySelector('.sunrise').textContent = sunrise;
+    document.querySelector('.sunset').textContent = sunset;
+
+    const recommendation = getAgriculturalRecommendation(data);
+    document.querySelector('.recommendation p').textContent = recommendation;
     
     const iconMap = { 'Clear': 'fa-sun', 'Clouds': 'fa-cloud', 'Rain': 'fa-cloud-rain', 'Thunderstorm': 'fa-bolt' };
     document.querySelector('.weather-icon i').className = `fas ${iconMap[data.weather[0].main] || 'fa-cloud'}`;
+}
+
+function getAgriculturalRecommendation(data) {
+    const condition = data.weather[0].main.toLowerCase();
+    const temp = data.main.temp;
+
+    if (condition.includes('rain')) return "Rainy weather detected. Avoid spraying pesticides or fertilizers today. Ensure proper drainage in fields.";
+    if (temp > 35) return "High temperature alert. Increase irrigation frequency and provide shade for young saplings where possible.";
+    if (temp < 10) return "Cold weather warning. Protect sensitive crops from frost and maintain optimal moisture.";
+    if (condition.includes('cloud')) return "Cloudy skies. Good time for manual weeding and soil preparation.";
+    return "Weather looks favorable for most agricultural activities. Ideal time for general maintenance and harvesting.";
 }
 
 function getLocationAndUpdateWeather() {
@@ -746,9 +768,15 @@ function getLocationAndUpdateWeather() {
             // Cache location data
             setCache('location', userLocation, CACHE_CONFIG.location.ttl);
             updateWeather();
-        }, () => {
-            console.log('Location access denied');
+        }, (error) => {
+            console.log('Location access error:', error.message);
+            document.querySelector('.condition').textContent = 'Location denied';
+            document.querySelector('.recommendation p').textContent = 'Please enable location access and check your weather API key to see local weather and recommendations.';
+        }, {
+            timeout: 10000
         });
+    } else {
+        document.querySelector('.condition').textContent = 'Unsupported';
     }
 }
 
